@@ -54,7 +54,7 @@ run("git add -A");
 const hasChanges = run("git diff --staged --quiet", true) === false;
 if (hasChanges) {
   run("git commit -m " + JSON.stringify(msg));
-  run("git push");
+  run("git push -u origin HEAD");
   console.log("Pushed to GitHub.");
 } else {
   console.log("No changes to commit.");
