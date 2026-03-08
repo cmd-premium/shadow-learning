@@ -14,7 +14,7 @@ const LOG_TO_SHEET_APP_URL = process.env.LOG_TO_SHEET_APP_URL || "";
 const ROOT = __dirname;
 const BINDINGS_FILE = path.join(ROOT, "bindings.json");
 
-const VALID_KEY_HASHES = ["15a0", "16qo"];
+const VALID_KEY_HASHES = ["15a0", "16qo", "14ik"];
 
 const MIMES = {
   ".html": "text/html",

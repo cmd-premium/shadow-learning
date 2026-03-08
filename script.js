@@ -8,7 +8,7 @@ function hashKey(s) {
   }
   return (h >>> 0).toString(36);
 }
-var ACCESS_KEY_HASHES = ["15a0", "16qo"];  // hashKey("624"), hashKey("819")
+var ACCESS_KEY_HASHES = ["15a0", "16qo", "14ik"];  // hashKey("624"), hashKey("819"), hashKey("518")
 
 // Optional: set to your API URL to bind each key to one device (stops "share my code").
 // Leave empty "" for keys that can be used on any device.
