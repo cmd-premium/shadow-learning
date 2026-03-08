@@ -4,6 +4,7 @@
   "description": "Shadow Learning – site + key check + sheet log",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "push": "node scripts/push-to-github.js"
   }
 }
