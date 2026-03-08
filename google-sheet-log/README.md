@@ -1,33 +1,33 @@
 # Log key usage to a Google Sheet
 
-Each time someone enters a valid key, you can log **device** (fingerprint) and **key** to a Google Sheet.
+Logs go to **4 sheets** in one spreadsheet: Success logs, Fail logs, All logs, and Keys.
 
 ## 1. Create the sheet and script
 
 1. Create a new [Google Sheet](https://sheets.google.com) (or use an existing one).
-2. In row 1, add headers: **Date** | **Device** | **Key**
-3. Go to **Extensions → Apps Script**. Delete any sample code and paste in the contents of **Code.gs** from this folder.
-4. Save (Ctrl+S). Click **Deploy → New deployment** → choose **Web app**.
+2. Add **4 sheets (tabs)** with these exact names:
+   - **Success logs** – row 1: `Date` | `Device` | `Key`
+   - **Fail logs** – row 1: `Date` | `Device` | `Key` | `Error`
+   - **All logs** – row 1: `Date` | `Device` | `Key` | `Status`
+   - **Keys** – row 1: `Key` | `Device` | `Date` (current key → device; script can add this if the sheet is empty)
+3. Go to **Extensions → Apps Script**. Paste in the contents of **Code.gs** from this folder.
+4. Save (Ctrl+S). **Deploy → New deployment** → **Web app**.
    - **Execute as:** Me  
    - **Who has access:** Anyone  
-5. Click **Deploy**, then copy the **Web app URL** (looks like `https://script.google.com/macros/s/.../exec`).
+5. Copy the **Web app URL** (e.g. `https://script.google.com/macros/s/.../exec`).
 
-## 2. Connect your site
+## 2. What gets logged
 
-**If you run `server.js`** (e.g. locally or on Railway/Render):
+- **Success logs** – Each time a valid key unlocks (date, device, key).
+- **Fail logs** – Invalid key or “key already in use” (date, device, key, error message).
+- **All logs** – Every attempt with status “Success” or “Fail”.
+- **Keys** – One row per key: which key is associated to which device (updated when that key is used successfully).
 
-- Set env var **LOG_TO_SHEET_APP_URL** to the Web app URL you copied:
-  ```bash
-  set LOG_TO_SHEET_APP_URL=https://script.google.com/macros/s/.../exec
-  node server.js
-  ```
-- In **script.js** set:
-  ```js
-  var LOG_TO_SHEET_URL = "http://localhost:3000/log-key";   // or your deployed server URL + /log-key
-  ```
+## 3. Connect your site
 
-**If you host only static files** (e.g. GitHub Pages) and don’t run server.js:
+**If you run server.js** (e.g. Railway):
 
-- You need a backend that forwards to Google (CORS blocks the browser from posting straight to Apps Script). Deploy **server.js** somewhere, set **LOG_TO_SHEET_APP_URL** on that server, and set **LOG_TO_SHEET_URL** in script.js to `https://your-server.com/log-key`.
+- Set **LOG_TO_SHEET_APP_URL** on the server to the Web app URL.
+- In **script.js** set **LOG_TO_SHEET_URL** to your server URL + `/log-key` (e.g. `https://your-app.up.railway.app/log-key`).
 
-Each successful key entry will add a row to your sheet: date, device fingerprint, and the key used.
+**If you host only static files:** Deploy server.js somewhere, set **LOG_TO_SHEET_APP_URL** there, and set **LOG_TO_SHEET_URL** in script.js to that server’s `/log-key` URL.

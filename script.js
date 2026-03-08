@@ -123,7 +123,26 @@ function setUnlocked() {
       errorEl.textContent = "";
     }
     var keyHash = hashKey(key);
+    var fp = getDeviceFingerprint() || "unknown";
+
+    function logToSheet(status, errMsg) {
+      var sheetUrl = (typeof LOG_TO_SHEET_URL === "string" && LOG_TO_SHEET_URL.trim()) ? LOG_TO_SHEET_URL.trim() : "";
+      if (!sheetUrl) return;
+      fetch(sheetUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          key: key,
+          keyHash: keyHash,
+          fingerprint: fp,
+          status: status,
+          error: errMsg || ""
+        })
+      }).catch(function () {});
+    }
+
     if (ACCESS_KEY_HASHES.indexOf(keyHash) === -1) {
+      logToSheet("fail", "Invalid key");
       input.classList.add("error");
       if (errorEl) {
         errorEl.textContent = "Invalid key. Please try again.";
@@ -134,19 +153,7 @@ function setUnlocked() {
     }
 
     function unlock() {
-      var sheetUrl = (typeof LOG_TO_SHEET_URL === "string" && LOG_TO_SHEET_URL.trim()) ? LOG_TO_SHEET_URL.trim() : "";
-      var fp = getDeviceFingerprint() || "unknown";
-      if (sheetUrl) {
-        fetch(sheetUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            key: key,
-            keyHash: keyHash,
-            fingerprint: fp
-          })
-        }).catch(function () {});
-      }
+      logToSheet("success");
       setUnlocked();
       document.body.classList.remove("key-gate-visible");
       document.body.classList.add("home-visible");
@@ -182,6 +189,7 @@ function setUnlocked() {
           return;
         }
         if (result.data && result.data.error) {
+          logToSheet("fail", result.data.error);
           input.classList.add("error");
           if (errorEl) {
             errorEl.textContent = result.data.error;
