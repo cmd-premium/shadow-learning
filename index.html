@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function() {
+        var path = location.pathname.replace(/\/[^/]*$/, '/') || '/';
+        document.write('<base href="' + location.origin + path + '">');
+      })();
+    </script>
+    <title>Shadow Learning</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='fg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' stop-color='%2322d3ee'/><stop offset='100%25' stop-color='%23a78bfa'/></linearGradient></defs><rect width='32' height='32' rx='8' fill='%23050810'/><text x='16' y='22' font-size='16' text-anchor='middle' font-weight='bold' font-family='system-ui,sans-serif' fill='url(%23fg)'>S</text></svg>" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div id="loading-screen" class="loading-screen">
+      <div class="loading-bg">
+        <div class="loading-orb loading-orb-1"></div>
+        <div class="loading-orb loading-orb-2"></div>
+        <div class="loading-orb loading-orb-3"></div>
+        <div class="loading-orb loading-orb-4"></div>
+        <div class="loading-orb loading-orb-5"></div>
+        <div class="loading-orb loading-orb-6"></div>
+      </div>
+      <div class="loading-grid"></div>
+      <div class="loading-particles" aria-hidden="true">
+        <span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+      <div class="loading-content">
+        <div class="loading-ring"><div class="loading-ring-fill" id="loading-ring-fill"></div></div>
+        <h1 class="loading-logo">
+          <span class="loading-word">Shadow</span>
+          <span class="loading-word">Learning</span>
+        </h1>
+        <div class="loading-bar-wrap">
+          <div class="loading-bar" id="loading-bar"><span class="loading-bar-glow"></span></div>
+        </div>
+        <div class="loading-dots">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+      <div class="loading-burst" id="loading-burst"></div>
+    </div>
+
+    <section id="key-gate" class="key-gate" aria-label="Enter access key" aria-live="polite">
+      <div class="key-gate-card">
+        <p class="key-gate-badge">Premium</p>
+        <h2 class="key-gate-title">Shadow Learning</h2>
+        <p class="key-gate-desc">Enter your access key to continue.</p>
+        <form id="key-form" class="key-form" novalidate>
+          <input type="text" id="key-input" class="key-input" placeholder="Access key" autocomplete="off" aria-label="Access key" />
+          <button type="submit" class="key-submit">Unlock</button>
+        </form>
+        <p id="key-error" class="key-error" role="alert" hidden></p>
+      </div>
+    </section>
+
+    <section id="home-screen" class="home-screen" aria-label="Welcome">
+      <div class="home-screen-card">
+        <div class="home-screen-inner">
+          <p class="home-badge" aria-hidden="true">Premium</p>
+          <h1 class="home-title">Shadow Learning</h1>
+          <p class="home-status" aria-live="polite">
+            <span class="home-status-dot"></span>
+            Unblocked
+          </p>
+          <div class="home-actions">
+            <a href="#" id="home-play" class="home-btn home-btn--primary">Play</a>
+            <a href="learn.html" class="home-btn home-btn--secondary">Hide</a>
+            <a href="https://discord.gg" id="home-discord" class="home-btn home-btn--secondary" target="_blank" rel="noopener noreferrer">Discord</a>
+          </div>
+          <p class="home-credits">Credits @blackbelt24</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="main-app">
+    <aside class="rail">
+      <div class="rail-brand-wrap">
+        <span class="rail-brand">SL</span>
+        <span class="rail-pro" aria-hidden="true">Pro</span>
+      </div>
+      <nav class="rail-nav">
+        <a href="index.html" class="rail-link rail-link--active">Play</a>
+        <a href="learn.html" class="rail-link" aria-label="Hide" title="Hide">Hide</a>
+      </nav>
+      <div class="rail-foot">07</div>
+    </aside>
+
+    <div class="page">
+      <header class="mast">
+        <p class="mast-badge" aria-hidden="true">Premium</p>
+        <h1 class="mast-title">Shadow Learning</h1>
+        <p class="mast-tagline">This is <span class="tagline-word" id="tagline-word" aria-live="polite">secure</span>.</p>
+        <p class="mast-desc">Unlimited access. No ads. Every game opens in a private window.</p>
+        <div id="email-connect" class="email-connect" hidden>
+          <span class="email-connected-email" id="email-display"></span>
+          <span class="email-connected-badge" id="connected-badge">
+            <span class="email-connected-label">connected</span>
+          </span>
+        </div>
+      </header>
+
+      <div class="filter-wrap">
+        <input
+          type="search"
+          id="game-search"
+          class="game-search"
+          placeholder="Filter…"
+          autocomplete="off"
+          aria-label="Search games"
+        />
+        <p id="game-count" class="game-count" aria-live="polite"></p>
+      </div>
+
+      <div class="deck">
+        <div class="games-grid">
+          <button class="game-button" data-game-id="dodge">
+            <span class="game-num">01</span>
+            <span class="game-meta">
+              <span class="game-title">Asteroid Dodge</span>
+              <span class="game-tagline">Pilot your ship through the asteroid belt.</span>
+            </span>
+            <span class="game-arrow">→</span>
+          </button>
+          <button class="game-button" data-game-id="clicker">
+            <span class="game-num">02</span>
+            <span class="game-meta">
+              <span class="game-title">Circle Clicker</span>
+              <span class="game-tagline">Click the target as many times as you can.</span>
+            </span>
+            <span class="game-arrow">→</span>
+          </button>
+          <button class="game-button" data-game-id="snake">
+            <span class="game-num">03</span>
+            <span class="game-meta">
+              <span class="game-title">Snake</span>
+              <span class="game-tagline">Arrow keys. Eat food, grow, don't hit the walls.</span>
+            </span>
+            <span class="game-arrow">→</span>
+          </button>
+          <button class="game-button" data-game-id="reaction">
+            <span class="game-num">04</span>
+            <span class="game-meta">
+              <span class="game-title">Reaction</span>
+              <span class="game-tagline">Click when the screen turns green. Fastest time wins.</span>
+            </span>
+            <span class="game-arrow">→</span>
+          </button>
+          <button class="game-button" data-game-id="breakout">
+            <span class="game-num">05</span>
+            <span class="game-meta">
+              <span class="game-title">Breakout</span>
+              <span class="game-tagline">Bounce the ball, break all the bricks.</span>
+            </span>
+            <span class="game-arrow">→</span>
+          </button>
+          <button class="game-button" data-game-id="pong">
+            <span class="game-num">06</span>
+            <span class="game-meta">
+              <span class="game-title">Pong</span>
+              <span class="game-tagline">Move the paddle to keep the ball in play.</span>
+            </span>
+            <span class="game-arrow">→</span>
+          </button>
+          <button class="game-button" data-game-id="flappy">
+            <span class="game-num">07</span>
+            <span class="game-meta">
+              <span class="game-title">Flappy</span>
+              <span class="game-tagline">Click or press space to flap. Avoid the pipes.</span>
+            </span>
+            <span class="game-arrow">→</span>
+          </button>
+        </div>
+      </div>
+
+      <footer class="page-foot">
+        <p class="page-foot-tag">Premium member access</p>
+        <ul class="page-foot-list" aria-label="Benefits">
+          <li>Unlimited games</li>
+          <li>Secure &amp; private</li>
+          <li>No ads, ever</li>
+        </ul>
+      </footer>
+    </div>
+    </div>
+
+    <script src="ugs-games-list.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>

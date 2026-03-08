@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function() {
+        var path = location.pathname.replace(/\/[^/]*$/, '/') || '/';
+        document.write('<base href="' + location.origin + path + '">');
+      })();
+    </script>
+    <title>Shadow Learning</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='fg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' stop-color='%2322d3ee'/><stop offset='100%25' stop-color='%23a78bfa'/></linearGradient></defs><rect width='32' height='32' rx='8' fill='%23050810'/><text x='16' y='22' font-size='16' text-anchor='middle' font-weight='bold' font-family='system-ui,sans-serif' fill='url(%23fg)'>S</text></svg>" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --edu-bg: #05070a;
+        --edu-surface: rgba(10, 14, 22, 0.85);
+        --edu-primary: #22d3ee;
+        --edu-primary-2: #a78bfa;
+        --edu-text: #f0f2f7;
+        --edu-muted: #8b95a8;
+        --edu-border: rgba(148, 163, 184, 0.12);
+        --edu-premium: rgba(212, 175, 55, 0.95);
+        --edu-premium-soft: rgba(212, 175, 55, 0.12);
+        --font: "Outfit", system-ui, sans-serif;
+        --radius: 16px;
+        --ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        padding: 0;
+        min-height: 100vh;
+        font-family: var(--font);
+        font-size: 15px;
+        background: var(--edu-bg);
+        color: var(--edu-text);
+        line-height: 1.6;
+        background-image:
+          radial-gradient(ellipse 80% 50% at 50% -20%, rgba(34, 211, 238, 0.12), transparent 50%),
+          radial-gradient(ellipse 60% 40% at 100% 50%, rgba(167, 139, 250, 0.08), transparent 45%);
+      }
+      .edu-header {
+        background: var(--edu-surface);
+        backdrop-filter: blur(20px);
+        border-bottom: 1px solid var(--edu-border);
+        padding: 18px 28px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+      }
+      .edu-header-inner {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      .edu-badge {
+        padding: 5px 12px;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--edu-premium);
+        background: var(--edu-premium-soft);
+        border: 1px solid rgba(212, 175, 55, 0.35);
+        border-radius: 999px;
+      }
+      .edu-logo {
+        font-family: var(--font);
+        font-weight: 800;
+        font-size: 1.25rem;
+        letter-spacing: -0.03em;
+        background: linear-gradient(135deg, var(--edu-primary), var(--edu-primary-2));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .edu-nav a {
+        color: var(--edu-muted);
+        text-decoration: none;
+        padding: 8px 14px;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        transition: color 0.2s var(--ease), background 0.2s var(--ease);
+      }
+      .edu-nav a:hover {
+        color: var(--edu-primary);
+        background: rgba(34, 211, 238, 0.1);
+      }
+      .edu-main {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 44px 24px 64px;
+      }
+      .learn-home { display: block; }
+      .edu-hero {
+        text-align: center;
+        margin-bottom: 44px;
+        padding: 28px 0;
+      }
+      .edu-hero h1 {
+        font-family: var(--font);
+        font-weight: 800;
+        font-size: clamp(1.85rem, 4.5vw, 2.4rem);
+        letter-spacing: -0.04em;
+        color: var(--edu-text);
+        margin: 0 0 14px 0;
+        line-height: 1.2;
+      }
+      .edu-hero p {
+        font-size: 1rem;
+        color: var(--edu-muted);
+        margin: 0;
+        max-width: 520px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      .edu-subjects-intro {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--edu-muted);
+        margin-bottom: 22px;
+      }
+      .subject-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 18px;
+      }
+      .subject-card {
+        display: block;
+        padding: 26px 22px;
+        background: var(--edu-surface);
+        backdrop-filter: blur(16px);
+        color: var(--edu-text);
+        text-decoration: none;
+        font-family: var(--font);
+        font-weight: 700;
+        font-size: 1.08rem;
+        text-align: left;
+        border: 1px solid var(--edu-border);
+        border-radius: var(--radius);
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255,255,255,0.03) inset;
+        transition: border-color 0.25s var(--ease), box-shadow 0.25s var(--ease), transform 0.25s var(--ease);
+      }
+      .subject-card:hover {
+        border-color: rgba(34, 211, 238, 0.35);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35), 0 0 48px rgba(34, 211, 238, 0.12), 0 0 0 1px rgba(255,255,255,0.04) inset;
+        transform: translateY(-3px);
+      }
+      .subject-card .subject-emoji {
+        display: block;
+        font-size: 2rem;
+        margin-bottom: 14px;
+      }
+      .subject-card .subject-desc {
+        font-weight: 500;
+        font-size: 0.88rem;
+        color: var(--edu-muted);
+        margin-top: 8px;
+        line-height: 1.45;
+      }
+      .subject-section {
+        display: none;
+        background: var(--edu-surface);
+        backdrop-filter: blur(16px);
+        padding: 36px 32px 44px;
+        border-radius: var(--radius);
+        border: 1px solid var(--edu-border);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255,255,255,0.03) inset;
+        margin-bottom: 28px;
+      }
+      .subject-section.is-open { display: block; }
+      body.subject-open .learn-home { display: none; }
+      .back-link {
+        display: inline-block;
+        margin-bottom: 22px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--edu-primary);
+        text-decoration: none;
+        transition: color 0.2s var(--ease), text-shadow 0.2s var(--ease);
+      }
+      .back-link:hover { color: #67e8f9; text-shadow: 0 0 20px rgba(34, 211, 238, 0.5); }
+      .subject-section h2 {
+        font-family: var(--font);
+        font-weight: 700;
+        font-size: 1.5rem;
+        color: var(--edu-text);
+        margin: 0 0 22px 0;
+        padding-bottom: 14px;
+        border-bottom: 1px solid var(--edu-border);
+      }
+      .subject-section p, .subject-section li {
+        margin: 0 0 14px 0;
+        color: var(--edu-text);
+      }
+      .subject-section ul {
+        margin: 0 0 22px 0;
+        padding-left: 24px;
+      }
+      .key-term {
+        font-weight: 700;
+        color: var(--edu-primary);
+      }
+      .edu-footer {
+        margin-top: 52px;
+        padding-top: 26px;
+        border-top: 1px solid var(--edu-border);
+        font-size: 13px;
+        color: var(--edu-muted);
+        text-align: center;
+      }
+      .edu-footer-tag {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <script>
+      try {
+        if (localStorage.getItem("sl_unlocked") !== "1") {
+          window.location.replace("index.html");
+        }
+      } catch (e) {
+        window.location.replace("index.html");
+      }
+    </script>
+    <header class="edu-header">
+      <div class="edu-header-inner">
+        <span class="edu-badge" aria-hidden="true">Premium</span>
+        <span class="edu-logo">Shadow Learning</span>
+      </div>
+      <nav class="edu-nav">
+        <a href="index.html">Home</a>
+      </nav>
+    </header>
+
+    <main class="edu-main">
+      <div class="learn-home">
+        <section class="edu-hero">
+          <h1>Member learning resources</h1>
+          <p>Select a subject to explore study guides, key topics, and curriculum standards. Included in your plan.</p>
+        </section>
+
+        <p class="edu-subjects-intro">Choose a subject</p>
+        <div class="subject-grid" id="subjects">
+          <a href="#math" class="subject-card" data-subject="math">
+            <span class="subject-emoji">📐</span>
+            Math
+            <span class="subject-desc">Ratios, expressions, equations, and geometry</span>
+          </a>
+          <a href="#science" class="subject-card" data-subject="science">
+            <span class="subject-emoji">🔬</span>
+            Science
+            <span class="subject-desc">Life, Earth, and physical science</span>
+          </a>
+          <a href="#ela" class="subject-card" data-subject="ela">
+            <span class="subject-emoji">📖</span>
+            English Language Arts
+            <span class="subject-desc">Reading, writing, and language</span>
+          </a>
+          <a href="#social-studies" class="subject-card" data-subject="social-studies">
+            <span class="subject-emoji">🌍</span>
+            Social Studies
+            <span class="subject-desc">World history, civics, and geography</span>
+          </a>
+          <a href="#technology" class="subject-card" data-subject="technology">
+            <span class="subject-emoji">💻</span>
+            Technology
+            <span class="subject-desc">Digital citizenship and computer basics</span>
+          </a>
+        </div>
+      </div>
+
+      <section class="subject-section" id="math">
+        <a href="#" class="back-link" data-back>← Back to all subjects</a>
+        <h2>📐 Math</h2>
+        <p><span class="key-term">Ratios and proportional relationships</span> — In 7th grade you work with ratios, unit rates, and proportions. You use them to solve real-world problems like scaling recipes or comparing prices.</p>
+        <p><span class="key-term">Expressions and equations</span> — You simplify expressions, solve multi-step equations, and graph linear equations. For example: solve for <em>x</em> when 2<em>x</em> + 5 = 15.</p>
+        <p><span class="key-term">Geometry</span> — You find area and circumference of circles, area and surface area of 2D and 3D shapes, and use the formulas &pi;<em>r</em>&sup2; and 2&pi;<em>r</em>.</p>
+        <ul>
+          <li>Practice: Draw a circle with radius 5 cm. Find its area and circumference.</li>
+          <li>Practice: Solve 3(<em>x</em> &minus; 2) = 12.</li>
+        </ul>
+      </section>
+
+      <section class="subject-section" id="science">
+        <a href="#" class="back-link" data-back>← Back to all subjects</a>
+        <h2>🔬 Science</h2>
+        <p><span class="key-term">Life science</span> — You study cells, heredity, and how organisms interact with their environment. You learn that cells are the basic unit of life and that traits are passed from parents to offspring through genes.</p>
+        <p><span class="key-term">Earth and space science</span> — You explore the rock cycle, plate tectonics, and Earth's place in the solar system. You learn how weathering and erosion shape the land and how the seasons are caused by Earth's tilt.</p>
+        <p><span class="key-term">Physical science</span> — You learn about matter, energy, and forces. Topics include chemical reactions, motion, and simple machines.</p>
+        <ul>
+          <li>Key idea: The scientific method — ask a question, form a hypothesis, run an experiment, and draw conclusions.</li>
+        </ul>
+      </section>
+
+      <section class="subject-section" id="ela">
+        <a href="#" class="back-link" data-back>← Back to all subjects</a>
+        <h2>📖 English Language Arts</h2>
+        <p><span class="key-term">Reading</span> — You analyze fiction and nonfiction: theme, central idea, author's purpose, and evidence from the text. You compare how different authors present similar ideas.</p>
+        <p><span class="key-term">Writing</span> — You write arguments with clear claims and evidence, informative essays that explain a topic, and narratives that use dialogue and description. You revise and edit for clarity and conventions.</p>
+        <p><span class="key-term">Language</span> — You use commas and semicolons correctly, understand phrases and clauses, and choose precise words. You also study Greek and Latin roots to build vocabulary.</p>
+        <ul>
+          <li>Tip: When answering a question about a passage, always cite evidence from the text.</li>
+        </ul>
+      </section>
+
+      <section class="subject-section" id="social-studies">
+        <a href="#" class="back-link" data-back>← Back to all subjects</a>
+        <h2>🌍 Social Studies</h2>
+        <p><span class="key-term">World history</span> — You study ancient civilizations, the rise of empires, and how trade and ideas spread. You look at primary and secondary sources to understand the past.</p>
+        <p><span class="key-term">Civics and government</span> — You learn how governments are organized, the idea of democracy, and the rights and responsibilities of citizens. You discuss how laws are made and why they matter.</p>
+        <p><span class="key-term">Geography</span> — You use maps and tools to understand location, climate, and how geography affects how people live. You compare regions and explain why they differ.</p>
+        <ul>
+          <li>Key skill: Distinguish between fact and opinion in sources.</li>
+        </ul>
+      </section>
+
+      <section class="subject-section" id="technology">
+        <a href="#" class="back-link" data-back>← Back to all subjects</a>
+        <h2>💻 Technology</h2>
+        <p><span class="key-term">Digital citizenship</span> — You learn to use the internet safely and responsibly: privacy, passwords, and how to tell real information from misinformation online.</p>
+        <p><span class="key-term">Computer basics</span> — You understand hardware (CPU, memory, storage) and software. You use word processors, spreadsheets, and presentations for school projects.</p>
+        <p><span class="key-term">Coding and problem-solving</span> — You use logic and step-by-step thinking to solve problems. You may use block-based or text-based coding to create simple programs and understand sequences, loops, and conditionals.</p>
+        <ul>
+          <li>Practice: Plan the steps to solve a problem before you start coding.</li>
+        </ul>
+      </section>
+
+      <footer class="edu-footer">
+        <p class="edu-footer-tag">Premium member resources</p>
+        <p>Grade 7 curriculum · Unlimited access</p>
+      </footer>
+    </main>
+    <script>
+      (function() {
+        var sections = document.querySelectorAll(".subject-section");
+        var body = document.body;
+        function openSubject(id) {
+          sections.forEach(function(s) { s.classList.toggle("is-open", s.id === id); });
+          body.classList.add("subject-open");
+        }
+        function closeSubject() {
+          sections.forEach(function(s) { s.classList.remove("is-open"); });
+          body.classList.remove("subject-open");
+        }
+        document.querySelectorAll(".subject-card").forEach(function(card) {
+          card.addEventListener("click", function(e) {
+            e.preventDefault();
+            openSubject(card.getAttribute("data-subject"));
+          });
+        });
+        document.querySelectorAll(".back-link[data-back]").forEach(function(link) {
+          link.addEventListener("click", function(e) {
+            e.preventDefault();
+            closeSubject();
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>
