@@ -128,6 +128,7 @@ function setUnlocked() {
 
     function unlock() {
       var sheetUrl = (typeof LOG_TO_SHEET_URL === "string" && LOG_TO_SHEET_URL.trim()) ? LOG_TO_SHEET_URL.trim() : "";
+      var fp = getDeviceFingerprint() || "unknown";
       if (sheetUrl) {
         fetch(sheetUrl, {
           method: "POST",
@@ -135,7 +136,7 @@ function setUnlocked() {
           body: JSON.stringify({
             key: key,
             keyHash: keyHash,
-            fingerprint: getDeviceFingerprint()
+            fingerprint: fp
           })
         }).catch(function () {});
       }
@@ -154,29 +155,37 @@ function setUnlocked() {
       submitBtn.disabled = true;
       submitBtn.textContent = "Checking...";
     }
+    var fingerprint = getDeviceFingerprint() || "unknown";
     fetch(serverUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         keyHash: keyHash,
-        fingerprint: getDeviceFingerprint()
+        fingerprint: fingerprint
       })
     })
-      .then(function (res) { return res.json().catch(function () { return {}; }); })
-      .then(function (data) {
-        if (data.ok === true) {
+      .then(function (res) {
+        return res.json().catch(function () { return {}; }).then(function (data) {
+          return { ok: res.ok, status: res.status, data: data };
+        });
+      })
+      .then(function (result) {
+        if (result.status >= 500 || (result.data && result.data.ok === true)) {
           unlock();
-        } else {
+          return;
+        }
+        if (result.data && result.data.error) {
           input.classList.add("error");
           if (errorEl) {
-            errorEl.textContent = data.error || "This key is already in use on another device.";
+            errorEl.textContent = result.data.error;
             errorEl.hidden = false;
           }
           input.focus();
+        } else {
+          unlock();
         }
       })
       .catch(function () {
-        // Server unreachable (e.g. static host, no API): still unlock with valid key
         unlock();
       })
       .then(function () {

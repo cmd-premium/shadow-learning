@@ -89,11 +89,12 @@ const server = http.createServer((req, res) => {
         return;
       }
 
-      if (!keyHash || !fingerprint) {
+      if (!keyHash) {
         res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: false, error: "Missing keyHash or fingerprint" }));
+        res.end(JSON.stringify({ ok: false, error: "Missing keyHash" }));
         return;
       }
+      fingerprint = fingerprint || "unknown";
 
       if (VALID_KEY_HASHES.indexOf(keyHash) === -1) {
         res.writeHead(200, { "Content-Type": "application/json" });
