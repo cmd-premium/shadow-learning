@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Check key</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 360px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.25rem; margin-bottom: 0.5rem; }
+    p { color: #666; font-size: 0.9rem; margin-bottom: 1rem; }
+    label { display: block; margin-bottom: 0.25rem; font-weight: 500; }
+    input[type="text"] { width: 100%; padding: 0.5rem; font-size: 1rem; box-sizing: border-box; }
+    button { margin-top: 0.75rem; padding: 0.5rem 1rem; font-size: 1rem; cursor: pointer; }
+    #result { margin-top: 1rem; padding: 0.75rem; border-radius: 6px; white-space: pre-wrap; font-size: 0.9rem; }
+    #result.ok { background: #d4edda; color: #155724; }
+    #result.err { background: #f8d7da; color: #721c24; }
+    #result.hidden { display: none; }
+  </style>
+</head>
+<body>
+  <h1>Check key</h1>
+  <p>Submit a key to the <code>/check-key</code> API (same as the main site). Use this page when the site is served from <code>server.js</code>.</p>
+  <form id="form">
+    <label for="key">Access key</label>
+    <input type="text" id="key" name="key" placeholder="e.g. 624" autocomplete="off">
+    <button type="submit">Check key</button>
+  </form>
+  <div id="result" class="hidden"></div>
+
+  <script>
+    function hashKey(s) {
+      var h = 0, str = String(s).trim();
+      for (var i = 0; i < str.length; i++) {
+        h = ((h << 5) - h) + str.charCodeAt(i) | 0;
+      }
+      return (h >>> 0).toString(36);
+    }
+    function getDeviceFingerprint() {
+      try {
+        var n = navigator || {}, s = screen || {};
+        var parts = [
+          n.userAgent || "",
+          (s.width || 0) + "x" + (s.height || 0),
+          (new Date().getTimezoneOffset()),
+          n.language || "",
+          (n.hardwareConcurrency || "") + (n.deviceMemory || "")
+        ];
+        return hashKey(parts.join("|"));
+      } catch (e) {
+        return "";
+      }
+    }
+
+    var form = document.getElementById("form");
+    var result = document.getElementById("result");
+
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var key = (document.getElementById("key").value || "").trim();
+      if (!key) {
+        result.className = "err";
+        result.textContent = "Enter a key.";
+        result.classList.remove("hidden");
+        return;
+      }
+
+      var keyHash = hashKey(key);
+      var fingerprint = getDeviceFingerprint();
+
+      result.classList.remove("hidden");
+      result.className = "";
+      result.textContent = "Sending…";
+
+      fetch("/check-key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keyHash: keyHash, fingerprint: fingerprint })
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (data.ok) {
+            result.className = "ok";
+            result.textContent = "OK — key is valid and bound to this device.";
+          } else {
+            result.className = "err";
+            result.textContent = data.error || "Request failed.";
+          }
+        })
+        .catch(function (err) {
+          result.className = "err";
+          result.textContent = "Error: " + (err.message || "Could not reach /check-key. Is server.js running?");
+        });
+    });
+  </script>
+</body>
+</html>
