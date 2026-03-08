@@ -1,6 +1,0 @@
-{
-  "name": "shadow-learning-key-server",
-  "version": "1.0.0",
-  "description": "Binds access keys to one device per key",
-  "main": "server.js"
-}
