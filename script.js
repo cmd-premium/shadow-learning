@@ -1,8 +1,15 @@
 // ——— Access key: valid keys are stored as hashes so the real key isn't in source.
 // To add a key "mykey", run in browser console: hashKey("mykey") then add that to ACCESS_KEY_HASHES.
+function normalizeKey(s) {
+  var str = String(s).trim().replace(/\s+/g, "");
+  str = str.replace(/\uFF10/g, "0").replace(/\uFF11/g, "1").replace(/\uFF12/g, "2")
+    .replace(/\uFF13/g, "3").replace(/\uFF14/g, "4").replace(/\uFF15/g, "5")
+    .replace(/\uFF16/g, "6").replace(/\uFF17/g, "7").replace(/\uFF18/g, "8").replace(/\uFF19/g, "9");
+  return str;
+}
 function hashKey(s) {
   var h = 0;
-  var str = String(s).trim();
+  var str = normalizeKey(s);
   for (var i = 0; i < str.length; i++) {
     h = ((h << 5) - h) + str.charCodeAt(i) | 0;
   }
@@ -109,7 +116,7 @@ function setUnlocked() {
 
   form.addEventListener("submit", function (e) {
     e.preventDefault();
-    var key = (input.value || "").trim();
+    var key = normalizeKey(input.value || "");
     input.classList.remove("error");
     if (errorEl) {
       errorEl.hidden = true;
