@@ -40,6 +40,13 @@ function saveBindings(obj) {
   fs.writeFileSync(BINDINGS_FILE, JSON.stringify(obj, null, 2), "utf8");
 }
 
+// Reset all key→device bindings so every code can be used on a new device.
+// Set env RESET_BINDINGS=true (or 1), then restart/redeploy. Remove it after one run.
+if (process.env.RESET_BINDINGS === "true" || process.env.RESET_BINDINGS === "1") {
+  saveBindings({});
+  console.log("Bindings reset (all codes cleared for new devices). Remove RESET_BINDINGS after this run.");
+}
+
 function serveFile(res, filePath) {
   const ext = path.extname(filePath);
   const mime = MIMES[ext] || "application/octet-stream";

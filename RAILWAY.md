@@ -70,6 +70,16 @@ No need to set `PORT`; Railway sets it for you.
 
 ---
 
+## Reset all codes (new devices can use them again)
+
+1. In Railway: your service → **Variables** → Add **RESET_BINDINGS** = **true**.
+2. **Redeploy** (Deployments → Redeploy, or push a commit).
+3. After the deploy has run once, **remove** the variable **RESET_BINDINGS** (or set it to **false**) so the next deploy doesn’t clear bindings again.
+
+All keys (624, 819, 518) are then unbound; the next device to use each key will get it.
+
+---
+
 **Quick checklist**
 
 - [ ] Repo on GitHub
