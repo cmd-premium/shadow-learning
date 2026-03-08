@@ -1,0 +1,79 @@
+# Deploy to Railway
+
+Use this to get a live URL for your site + key API + Google Sheet log.
+
+## 1. Push your project to GitHub
+
+1. Create a new repo on [github.com](https://github.com/new) (e.g. `shadow-learning`).
+2. In your project folder:
+   ```bash
+   git init
+   git add .
+   git commit -m "Initial commit"
+   git branch -M main
+   git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
+   git push -u origin main
+   ```
+
+## 2. Create a Railway project
+
+1. Go to [railway.app](https://railway.app) and sign in (GitHub is easiest).
+2. Click **New Project** → **Deploy from GitHub repo**.
+3. Choose your repo and (if asked) the **root** of the repo.
+4. Railway will detect the Node app from `package.json` and run `npm start` (= `node server.js`).
+
+## 3. Set environment variables
+
+In the Railway dashboard: your project → your service → **Variables**.
+
+Add:
+
+| Variable | Value |
+|----------|--------|
+| `LOG_TO_SHEET_APP_URL` | `https://script.google.com/macros/s/AKfycbzVsAj13FZsy4LmF2thbGf2_MSWxI4O7WoAIOCoOEZ0jkkjrLsTsG_Vz5qwxUxf79H4/exec` |
+
+(Use your real Apps Script Web App URL if different.)
+
+No need to set `PORT`; Railway sets it for you.
+
+## 4. Get your public URL
+
+1. In Railway: your service → **Settings** → **Networking** → **Generate Domain** (or use the one already there).
+2. You’ll get a URL like `https://your-app.up.railway.app`. Copy it.
+
+## 5. Point your site at Railway
+
+**If you serve the site from Railway** (you open `https://your-app.up.railway.app`):
+
+- In **script.js** set:
+  ```js
+  var KEY_SERVER_URL = "/check-key";
+  var LOG_TO_SHEET_URL = "/log-key";
+  ```
+  Then redeploy (push to GitHub or trigger deploy in Railway). The site and APIs are on the same origin.
+
+**If you host the site elsewhere** (e.g. GitHub Pages at `https://cmd-premium.github.io/...`):
+
+- In **script.js** set:
+  ```js
+  var KEY_SERVER_URL = "https://your-app.up.railway.app/check-key";
+  var LOG_TO_SHEET_URL = "https://your-app.up.railway.app/log-key";
+  ```
+  Replace `your-app.up.railway.app` with your real Railway domain.
+
+  For **check-key** to work from another origin, the server already sends `Access-Control-Allow-Origin: *`, so it should work. If you see CORS errors for **log-key**, the server is set to allow that too.
+
+## 6. Deploy
+
+- Every `git push` to your main branch will redeploy.
+- Or in Railway: **Deployments** → **Redeploy** for the latest commit.
+
+---
+
+**Quick checklist**
+
+- [ ] Repo on GitHub
+- [ ] Railway project from that repo
+- [ ] `LOG_TO_SHEET_APP_URL` variable set
+- [ ] Domain generated, URL copied
+- [ ] `script.js` updated with your Railway URL (or `/check-key` and `/log-key` if site is on Railway)

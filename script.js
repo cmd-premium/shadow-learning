@@ -13,7 +13,11 @@ var ACCESS_KEY_HASHES = ["15a0", "16qo"];  // hashKey("624"), hashKey("819")
 // Optional: set to your API URL to bind each key to one device (stops "share my code").
 // Leave empty "" for keys that can be used on any device.
 // Use "/check-key" when you run server.js (same server). Or set a full URL if key API is elsewhere.
-var KEY_SERVER_URL = "/check-key";
+var KEY_SERVER_URL = "https://shadow-learning-production.up.railway.app/check-key";
+
+// Optional: log each unlock to a Google Sheet (device + key). See google-sheet-log/ folder.
+// Use "/log-key" when running server.js (server forwards to Google). Or your Apps Script Web App URL.
+var LOG_TO_SHEET_URL = "https://shadow-learning-production.up.railway.app/log-key";
 
 function getDeviceFingerprint() {
   try {
@@ -72,6 +76,9 @@ function setUnlocked() {
     document.body.classList.add("loading-done");
     try {
       sessionStorage.setItem("shadowLearningLoaded", "1");
+      // Require key every time loading screen shows (no persistent unlock)
+      localStorage.removeItem("sl_unlocked");
+      localStorage.removeItem("sl_fp");
     } catch (e) {}
     if (isUnlocked()) {
       document.body.classList.add("home-visible");
@@ -120,6 +127,18 @@ function setUnlocked() {
     }
 
     function unlock() {
+      var sheetUrl = (typeof LOG_TO_SHEET_URL === "string" && LOG_TO_SHEET_URL.trim()) ? LOG_TO_SHEET_URL.trim() : "";
+      if (sheetUrl) {
+        fetch(sheetUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            key: key,
+            keyHash: keyHash,
+            fingerprint: getDeviceFingerprint()
+          })
+        }).catch(function () {});
+      }
       setUnlocked();
       document.body.classList.remove("key-gate-visible");
       document.body.classList.add("home-visible");
@@ -157,11 +176,8 @@ function setUnlocked() {
         }
       })
       .catch(function () {
-        if (errorEl) {
-          errorEl.textContent = "Could not verify key. Try again or check your connection.";
-          errorEl.hidden = false;
-        }
-        input.focus();
+        // Server unreachable (e.g. static host, no API): still unlock with valid key
+        unlock();
       })
       .then(function () {
         if (submitBtn) {

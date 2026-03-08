@@ -1,6 +1,9 @@
 {
-  "name": "shadow-learning-key-server",
+  "name": "shadow-learning",
   "version": "1.0.0",
-  "description": "Binds access keys to one device per key",
-  "main": "server.js"
+  "description": "Shadow Learning – site + key check + sheet log",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
 }
