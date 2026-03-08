@@ -8,8 +8,9 @@
 const { execSync } = require("child_process");
 const path = require("path");
 
-const root = path.resolve(__dirname, "..");
-const msg = process.argv[2] || "Update " + new Date().toISOString().slice(0, 19).replace("T", " "));
+const scriptDir = __dirname;
+const root = path.dirname(scriptDir);
+const msg = process.argv[2] || "Update " + new Date().toISOString().slice(0, 19).replace("T", " ");
 
 function run(cmd, allowFail) {
   try {
@@ -24,7 +25,7 @@ function run(cmd, allowFail) {
 run("git add -A");
 const hasChanges = run("git diff --staged --quiet", true) === false;
 if (hasChanges) {
-  run(`git commit -m "${msg.replace(/"/g, '\\"')}"`);
+  run("git commit -m " + JSON.stringify(msg));
   run("git push");
   console.log("Pushed to GitHub.");
 } else {
