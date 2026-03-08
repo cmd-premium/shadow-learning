@@ -12,9 +12,8 @@ var ACCESS_KEY_HASHES = ["15a0", "16qo"];  // hashKey("624"), hashKey("819")
 
 // Optional: set to your API URL to bind each key to one device (stops "share my code").
 // Leave empty "" for keys that can be used on any device.
-// Set to your key-server URL + "/check-key" to bind each key to one device (stops sharing codes).
-// Run key-server locally or deploy key-server/ to Railway/Render and use that URL.
-var KEY_SERVER_URL = "";
+// Use "/check-key" when you run server.js (same server). Or set a full URL if key API is elsewhere.
+var KEY_SERVER_URL = "/check-key";
 
 function getDeviceFingerprint() {
   try {
