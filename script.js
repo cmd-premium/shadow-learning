@@ -10,6 +10,12 @@ function hashKey(s) {
 }
 var ACCESS_KEY_HASHES = ["15a0", "16qo"];  // hashKey("624"), hashKey("819")
 
+// Optional: set to your API URL to bind each key to one device (stops "share my code").
+// Leave empty "" for keys that can be used on any device.
+// Set to your key-server URL + "/check-key" to bind each key to one device (stops sharing codes).
+// Run key-server locally or deploy key-server/ to Railway/Render and use that URL.
+var KEY_SERVER_URL = "";
+
 function getDeviceFingerprint() {
   try {
     var n = typeof navigator !== "undefined" ? navigator : {};
@@ -87,11 +93,12 @@ function setUnlocked() {
   }, 4500);
 })();
 
-// ——— Key gate: submit key to unlock ———
+// ——— Key gate: submit key to unlock (optional server binds key to one device) ———
 (function keyGate() {
   var form = document.getElementById("key-form");
   var input = document.getElementById("key-input");
   var errorEl = document.getElementById("key-error");
+  var submitBtn = form ? form.querySelector(".key-submit") : null;
   if (!form || !input) return;
 
   form.addEventListener("submit", function (e) {
@@ -103,19 +110,66 @@ function setUnlocked() {
       errorEl.textContent = "";
     }
     var keyHash = hashKey(key);
-    var valid = ACCESS_KEY_HASHES.indexOf(keyHash) !== -1;
-    if (valid) {
-      setUnlocked();
-      document.body.classList.remove("key-gate-visible");
-      document.body.classList.add("home-visible");
-    } else {
+    if (ACCESS_KEY_HASHES.indexOf(keyHash) === -1) {
       input.classList.add("error");
       if (errorEl) {
         errorEl.textContent = "Invalid key. Please try again.";
         errorEl.hidden = false;
       }
       input.focus();
+      return;
     }
+
+    function unlock() {
+      setUnlocked();
+      document.body.classList.remove("key-gate-visible");
+      document.body.classList.add("home-visible");
+    }
+
+    var serverUrl = (typeof KEY_SERVER_URL === "string" && KEY_SERVER_URL.trim()) ? KEY_SERVER_URL.trim() : "";
+    if (!serverUrl) {
+      unlock();
+      return;
+    }
+
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Checking...";
+    }
+    fetch(serverUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        keyHash: keyHash,
+        fingerprint: getDeviceFingerprint()
+      })
+    })
+      .then(function (res) { return res.json().catch(function () { return {}; }); })
+      .then(function (data) {
+        if (data.ok === true) {
+          unlock();
+        } else {
+          input.classList.add("error");
+          if (errorEl) {
+            errorEl.textContent = data.error || "This key is already in use on another device.";
+            errorEl.hidden = false;
+          }
+          input.focus();
+        }
+      })
+      .catch(function () {
+        if (errorEl) {
+          errorEl.textContent = "Could not verify key. Try again or check your connection.";
+          errorEl.hidden = false;
+        }
+        input.focus();
+      })
+      .then(function () {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Unlock";
+        }
+      });
   });
 })();
 
