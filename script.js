@@ -198,10 +198,6 @@ function setUnlocked() {
         }
         var serverOk = result.data && result.data.ok === true;
         var serverError = result.data && result.data.error;
-        if (result.status >= 500) {
-          unlock();
-          return;
-        }
         if (serverOk) {
           unlock();
           return;
@@ -216,18 +212,20 @@ function setUnlocked() {
           input.focus();
           return;
         }
-        if (result.status >= 400) {
-          if (errorEl) {
-            errorEl.textContent = "Could not verify key. Try again or check your connection.";
-            errorEl.hidden = false;
-          }
-          input.focus();
-          return;
+        if (errorEl) {
+          errorEl.textContent = result.status >= 500
+            ? "Server error. Please try again later."
+            : "Could not verify key. Check your connection and try again.";
+          errorEl.hidden = false;
         }
-        unlock();
+        input.focus();
       })
       .catch(function () {
-        unlock();
+        if (errorEl) {
+          errorEl.textContent = "Could not verify key. Check your connection and try again.";
+          errorEl.hidden = false;
+        }
+        input.focus();
       })
       .then(function () {
         if (submitBtn) {
