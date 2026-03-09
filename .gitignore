@@ -1,7 +1,5 @@
 node_modules/
 bindings.json
-valid-keys.json
-bot-commands.json
+give-codes-assignments.json
 .env
 .env.local
-discord-bot/.env

@@ -9,60 +9,59 @@ const https = require("https");
 const fs = require("fs");
 const path = require("path");
 const urlModule = require("url");
+const crypto = require("crypto");
 
 const PORT = process.env.PORT || 3000;
 const LOG_TO_SHEET_APP_URL = process.env.LOG_TO_SHEET_APP_URL || "";
-const ADD_KEY_SECRET = process.env.ADD_KEY_SECRET || "";
+const CODES_PAGE_SECRET = process.env.CODES_PAGE_SECRET || "";
 const ROOT = __dirname;
 const BINDINGS_FILE = path.join(ROOT, "bindings.json");
-const VALID_KEYS_FILE = path.join(ROOT, "valid-keys.json");
-const BOT_COMMANDS_FILE = path.join(ROOT, "bot-commands.json");
+const GIVE_CODES_ASSIGNMENTS_FILE = path.join(ROOT, "give-codes-assignments.json");
+const GIVE_CODES_LIST = ["624", "819", "518", "123"];
 
-const VALID_KEY_HASHES_BASE = ["15a0", "16qo", "14ik", "11ki"];
+const VALID_KEY_HASHES = ["15a0", "16qo", "14ik", "11ki"];
 
-function normalizeKey(s) {
-  let str = String(s).trim().replace(/\s+/g, "");
-  const full = "\uFF10\uFF11\uFF12\uFF13\uFF14\uFF15\uFF16\uFF17\uFF18\uFF19";
-  const half = "0123456789";
-  for (let i = 0; i < full.length; i++) str = str.replace(new RegExp(full[i], "g"), half[i]);
-  return str;
-}
-function hashKey(s) {
-  let h = 0;
-  const str = normalizeKey(s);
-  for (let i = 0; i < str.length; i++) {
-    h = ((h << 5) - h) + str.charCodeAt(i) | 0;
-  }
-  return (h >>> 0).toString(36);
-}
-
-function loadValidKeyHashes() {
+function loadGiveCodesAssignments() {
   try {
-    const data = JSON.parse(fs.readFileSync(VALID_KEYS_FILE, "utf8"));
-    return Array.isArray(data.hashes) ? data.hashes : [];
+    return JSON.parse(fs.readFileSync(GIVE_CODES_ASSIGNMENTS_FILE, "utf8"));
   } catch (e) {
-    return [];
+    return {};
   }
-}
-function saveValidKeyHashes(hashes) {
-  fs.writeFileSync(VALID_KEYS_FILE, JSON.stringify({ hashes }, null, 2), "utf8");
-}
-function getAllValidKeyHashes() {
-  const dynamic = loadValidKeyHashes();
-  const set = new Set([...VALID_KEY_HASHES_BASE, ...dynamic]);
-  return Array.from(set);
 }
 
-function loadBotCommands() {
-  try {
-    const data = JSON.parse(fs.readFileSync(BOT_COMMANDS_FILE, "utf8"));
-    return Array.isArray(data.commands) ? data.commands : [];
-  } catch (e) {
-    return [];
-  }
+function saveGiveCodesAssignments(obj) {
+  fs.writeFileSync(GIVE_CODES_ASSIGNMENTS_FILE, JSON.stringify(obj, null, 2), "utf8");
 }
-function saveBotCommands(commands) {
-  fs.writeFileSync(BOT_COMMANDS_FILE, JSON.stringify({ commands }, null, 2), "utf8");
+
+function parseCookie(header) {
+  if (!header) return {};
+  const out = {};
+  header.split(";").forEach((part) => {
+    const i = part.indexOf("=");
+    if (i === -1) return;
+    const key = part.slice(0, i).trim();
+    const val = part.slice(i + 1).trim();
+    if (key && val) out[key] = val;
+  });
+  return out;
+}
+
+function getOrAssignCode(visitorId) {
+  const assignments = loadGiveCodesAssignments();
+  if (visitorId && assignments[visitorId]) {
+    return { code: assignments[visitorId], isReturning: true };
+  }
+  const counts = {};
+  GIVE_CODES_LIST.forEach((c) => { counts[c] = 0; });
+  Object.values(assignments).forEach((c) => { if (counts[c] !== undefined) counts[c]++; });
+  let chosen = GIVE_CODES_LIST[0];
+  GIVE_CODES_LIST.forEach((c) => {
+    if (counts[c] < counts[chosen]) chosen = c;
+  });
+  const newId = visitorId || crypto.randomBytes(16).toString("hex");
+  assignments[newId] = chosen;
+  saveGiveCodesAssignments(assignments);
+  return { code: chosen, isReturning: false, visitorId: newId };
 }
 
 const MIMES = {
@@ -181,8 +180,7 @@ const server = http.createServer((req, res) => {
       }
       fingerprint = fingerprint || "unknown";
 
-      const validHashes = getAllValidKeyHashes();
-      if (validHashes.indexOf(keyHash) === -1) {
+      if (VALID_KEY_HASHES.indexOf(keyHash) === -1) {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ok: false, error: "Invalid key." }));
         return;
@@ -206,106 +204,6 @@ const server = http.createServer((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ ok: true }));
     });
-    return;
-  }
-
-  // Admin: add a new key (used by Discord bot). Requires ADD_KEY_SECRET.
-  if (url === "/admin/add-key" && ADD_KEY_SECRET) {
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-    if (req.method === "OPTIONS") {
-      res.writeHead(204);
-      res.end();
-      return;
-    }
-    if (req.method !== "POST") {
-      res.writeHead(404, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ ok: false, error: "Not found" }));
-      return;
-    }
-    let body = "";
-    req.on("data", (chunk) => { body += chunk; });
-    req.on("end", () => {
-      let secret, code;
-      try {
-        const data = JSON.parse(body);
-        secret = data.secret;
-        code = data.code != null ? String(data.code).trim() : "";
-      } catch (e) {
-        res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: false, error: "Invalid request" }));
-        return;
-      }
-      if (secret !== ADD_KEY_SECRET) {
-        res.writeHead(403, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: false, error: "Unauthorized" }));
-        return;
-      }
-      const normalized = normalizeKey(code);
-      if (!normalized) {
-        res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: false, error: "Missing code" }));
-        return;
-      }
-      const keyHash = hashKey(normalized);
-      const hashes = loadValidKeyHashes();
-      if (hashes.indexOf(keyHash) !== -1) {
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: true, code: normalized, message: "Code already registered" }));
-        return;
-      }
-      hashes.push(keyHash);
-      saveValidKeyHashes(hashes);
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ ok: true, code: normalized }));
-    });
-    return;
-  }
-
-  // Bot commands: public GET (for Discord bot), protected POST (for website with secret)
-  if (url === "/bot-commands") {
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-    if (req.method === "OPTIONS") {
-      res.writeHead(204);
-      res.end();
-      return;
-    }
-    if (req.method === "GET") {
-      const commands = loadBotCommands();
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ commands }));
-      return;
-    }
-    if (req.method === "POST" && ADD_KEY_SECRET) {
-      let body = "";
-      req.on("data", (chunk) => { body += chunk; });
-      req.on("end", () => {
-        let secret, commands;
-        try {
-          const data = JSON.parse(body);
-          secret = data.secret;
-          commands = Array.isArray(data.commands) ? data.commands : [];
-        } catch (e) {
-          res.writeHead(400, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ ok: false, error: "Invalid request" }));
-          return;
-        }
-        if (secret !== ADD_KEY_SECRET) {
-          res.writeHead(403, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ ok: false, error: "Unauthorized" }));
-          return;
-        }
-        saveBotCommands(commands);
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: true }));
-      });
-      return;
-    }
-    res.writeHead(404, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ ok: false, error: "Not found" }));
     return;
   }
 
@@ -347,6 +245,44 @@ const server = http.createServer((req, res) => {
       });
       proxy.write(logBody);
       proxy.end();
+    });
+    return;
+  }
+
+  // Give-codes page: only if ?access=CODES_PAGE_SECRET (for Discord bot link)
+  if (url === "/give-codes") {
+    const access = (query.access && String(query.access).trim()) || "";
+    if (!CODES_PAGE_SECRET || access !== CODES_PAGE_SECRET) {
+      res.writeHead(403, { "Content-Type": "text/html; charset=utf-8" });
+      res.end(
+        "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"/><title>Access denied</title></head><body style=\"font-family:system-ui;background:#030406;color:#f4f5f9;min-height:100vh;display:flex;align-items:center;justify-content:center;margin:0\"><p>Access denied.</p></body></html>"
+      );
+      return;
+    }
+    const cookieHeader = req.headers["cookie"] || "";
+    const cookies = parseCookie(cookieHeader);
+    const visitorId = (cookies.gc_visitor && String(cookies.gc_visitor).trim()) || null;
+    const result = getOrAssignCode(visitorId);
+    const codesPath = path.join(ROOT, "give-codes.html");
+    fs.readFile(codesPath, "utf8", (err, data) => {
+      if (err) {
+        res.writeHead(404, { "Content-Type": "text/plain" });
+        res.end("Not found");
+        return;
+      }
+      const code = result.code;
+      const message = result.isReturning
+        ? "Welcome back — here’s the same code as last time."
+        : "Your access code is below. We’ll remember you next time.";
+      let html = data
+        .replace(/\{\{CODE\}\}/g, code)
+        .replace(/\{\{MESSAGE\}\}/g, message);
+      const headers = { "Content-Type": "text/html; charset=utf-8" };
+      if (result.visitorId) {
+        headers["Set-Cookie"] = "gc_visitor=" + result.visitorId + "; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax";
+      }
+      res.writeHead(200, headers);
+      res.end(html);
     });
     return;
   }
@@ -467,8 +403,13 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Static files
+  // Static files (give-codes.html is only served via /give-codes?access=...)
   let filePath = path.join(ROOT, url === "/" ? "index.html" : url);
+  if (url === "/give-codes.html" || path.basename(filePath) === "give-codes.html") {
+    res.writeHead(404, { "Content-Type": "text/plain" });
+    res.end("Not found");
+    return;
+  }
   if (!path.resolve(filePath).startsWith(path.resolve(ROOT))) {
     res.writeHead(403);
     res.end("Forbidden");
