@@ -88,3 +88,52 @@ All keys (624, 819, 518) are then unbound; the next device to use each key will 
 - [ ] `LOG_TO_SHEET_APP_URL` variable set
 - [ ] Domain generated, URL copied
 - [ ] `script.js` updated with your Railway URL (or `/check-key` and `/log-key` if site is on Railway)
+
+---
+
+## Run the Discord bot on Railway (24/7)
+
+So the bot stays online all the time, deploy it as a **second service** in the same Railway project.
+
+### Step 1: Add a new service
+
+1. Go to [railway.app](https://railway.app) and open your **Shadow Learning** project.
+2. Click **+ New** (or **Add Service**).
+3. Choose **GitHub Repo** and select the **same repo** you use for the site (`shadow-learning` or whatever it’s named).
+4. After the service is created, click it to open its settings.
+
+### Step 2: Use the `discord-bot` folder
+
+1. Click the new service → **Settings** (or the **Settings** tab).
+2. Find **Root Directory** (under “Build” or “Source”).
+3. Click **Override** or **Add variable** and set:
+   - **Root Directory:** `discord-bot`
+4. Under **Build Command** (if shown): leave default or set to `npm install`.
+5. Under **Start Command** (if shown): set to `npm start` or `node index.js`.
+6. Save. Railway will redeploy using only the `discord-bot` folder.
+
+### Step 3: Set the bot’s environment variables
+
+1. With the **bot service** selected, open the **Variables** tab.
+2. Click **+ New Variable** (or **Add Variable**) and add these **one by one**:
+
+| Variable             | Value |
+|----------------------|--------|
+| `DISCORD_BOT_TOKEN`  | Your bot token from [Discord Developer Portal](https://discord.com/developers/applications) → your app → **Bot** → **Reset Token** (copy once) |
+| `KEY_SERVER_URL`     | `https://shadow-learning-production.up.railway.app` (or your key server’s URL) |
+| `ADD_KEY_SECRET`     | **Same value** as `ADD_KEY_SECRET` on your **main** (site) service — e.g. `25aa75d02dbf3ff8bb8f77dfa91b09fe60c7c15130efc2d4ce01e8c162d6c365` |
+| `STAFF_ROLE_NAME`    | `Customer` (or the role name you use for people who can run `!code`) |
+
+3. Save. Railway will redeploy with the new variables.
+
+### Step 4: Deploy and check
+
+1. Go to **Deployments**. The latest deployment should be building/running.
+2. When it’s **Success** (green), the bot is running. Open your Discord server — the bot should show as **Online** (green dot).
+3. You don’t need a public URL for the bot; it connects out to Discord. No need to “Generate Domain” for this service.
+
+### If the bot doesn’t come online
+
+- **Variables:** Confirm all four variables are set on the **bot service** (not the site service). No typos in names.
+- **Token:** If you ever reset the token in the Discord Developer Portal, update `DISCORD_BOT_TOKEN` in Railway and redeploy.
+- **Logs:** In Railway, open the bot service → **Deployments** → click the latest run → **View Logs**. Look for `Bot logged in as ...` or any error message.

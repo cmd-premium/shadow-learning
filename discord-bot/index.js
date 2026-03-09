@@ -3,22 +3,23 @@
  * Set DISCORD_BOT_TOKEN, KEY_SERVER_URL, ADD_KEY_SECRET, and STAFF_ROLE_NAME in .env
  */
 
-require("dotenv").config();
-const { Client, GatewayIntentBits } = require("discord.js");
+const path = require("path");
+require("dotenv").config({ path: path.join(__dirname, ".env") });
+const { Client, GatewayIntentBits, ActivityType } = require("discord.js");
 const https = require("https");
 const http = require("http");
 
-const TOKEN = process.env.DISCORD_BOT_TOKEN;
+const TOKEN = (process.env.DISCORD_BOT_TOKEN || "").trim();
 const KEY_SERVER_URL = (process.env.KEY_SERVER_URL || "").trim();
 const ADD_KEY_SECRET = (process.env.ADD_KEY_SECRET || "").trim();
 const STAFF_ROLE_NAME = (process.env.STAFF_ROLE_NAME || "Staff").trim();
 
 if (!TOKEN) {
-  console.error("Missing DISCORD_BOT_TOKEN. Set it in .env");
+  console.error("Missing DISCORD_BOT_TOKEN. Set it in .env (in the discord-bot folder).");
   process.exit(1);
 }
 if (!KEY_SERVER_URL || !ADD_KEY_SECRET) {
-  console.error("Set KEY_SERVER_URL and ADD_KEY_SECRET in .env (e.g. KEY_SERVER_URL=https://shadow-learning-production.up.railway.app)");
+  console.error("Set KEY_SERVER_URL and ADD_KEY_SECRET in .env");
   process.exit(1);
 }
 
@@ -78,6 +79,11 @@ const client = new Client({
 client.once("ready", () => {
   console.log(`Bot logged in as ${client.user.tag}`);
   console.log(`Staff role name: "${STAFF_ROLE_NAME}"`);
+  // Show as Online with a status so it’s visible in the member list
+  client.user.setPresence({
+    status: "online",
+    activities: [{ name: "!code for access", type: ActivityType.Watching }],
+  });
 });
 
 client.on("messageCreate", async (message) => {
@@ -111,5 +117,8 @@ client.on("messageCreate", async (message) => {
 
 client.login(TOKEN).catch((err) => {
   console.error("Login failed:", err.message);
+  if (err.message && err.message.includes("token")) {
+    console.error("Get a new token from Discord Developer Portal → your app → Bot → Reset Token, then put it in .env as DISCORD_BOT_TOKEN");
+  }
   process.exit(1);
 });

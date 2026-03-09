@@ -1,5 +1,7 @@
 # How to run the Discord bot
 
+Your bot is only **online in Discord while the script is running**. If you close the terminal or your PC sleeps, the bot goes offline. To have it online 24/7, run it on Railway (see bottom of this file).
+
 Your bot is already configured (token and settings are in `.env`). Do these two things:
 
 ---
@@ -34,9 +36,33 @@ So the bot can create new codes, your key server needs the same secret.
 
 ---
 
-**To stop the bot:** Press `Ctrl+C` in the terminal.
+**To stop the bot:** Press `Ctrl+C` in the terminal. The bot will go offline in Discord.
 
-**To run it again later:** Open terminal → `cd discord-bot` → `npm start` (no need to run `npm install` again unless you change the bot code).
+---
+
+## Run without typing npm start (Windows)
+
+You can start the bot without opening a terminal:
+
+1. **Double-click `start-bot.bat`**  
+   Bot runs in a window and **restarts automatically** if it crashes. Leave the window open.
+
+2. **Double-click `start-bot-silent.vbs`**  
+   Bot runs **in the background** (no window). It also restarts if it crashes.
+
+**Run the bot when Windows starts:**
+
+1. Press `Win + R`, type `shell:startup`, press Enter (opens your Startup folder).
+2. Copy `start-bot-silent.vbs` into that folder (or create a shortcut to it there).
+3. Next time you log in, the bot will start in the background by itself.
+
+To stop the bot when it’s running silently: open Task Manager, find **Node.js**, and end that task (or restart your PC).
+
+---
+
+## Run the bot on Render (24/7)
+
+See **RENDER.md** in this folder for running the bot on Render so it stays online without using your PC.
 
 ---
 
