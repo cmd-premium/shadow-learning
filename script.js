@@ -223,32 +223,109 @@ function setUnlocked() {
   });
 })();
 
-// ——— Rail: switch between Play and Browser panels ———
-(function railPanels() {
+// ——— In-app browser: fetch pages via proxy and show in our content area (no iframe) ———
+(function inAppBrowser() {
+  var BROWSER_PROXY = "";  // Same-origin; or set to "https://shadow-learning-production.up.railway.app" if site is on GitHub Pages
   var playPanel = document.getElementById("play-panel");
   var browserPanel = document.getElementById("browser-panel");
   var browserForm = document.getElementById("browser-form");
   var browserUrl = document.getElementById("browser-url");
-  var browserFrame = document.getElementById("browser-frame");
-  var links = document.querySelectorAll(".rail-link[data-page]");
-  if (!playPanel || !browserPanel || !browserFrame || !links.length) return;
+  var browserContent = document.getElementById("browser-content");
+  var browserLoading = document.getElementById("browser-loading");
+  var railLinks = document.querySelectorAll(".rail-link[data-page]");
+  if (!playPanel || !browserPanel || !browserContent || !railLinks.length) return;
+
+  function proxyUrl(targetUrl) {
+    var base = (BROWSER_PROXY || (location.origin + location.pathname.replace(/[^/]*$/, ""))) || "";
+    return base + "/browse?url=" + encodeURIComponent(targetUrl);
+  }
+
+  function isProxyLink(href) {
+    if (!href) return false;
+    var u;
+    try { u = new URL(href, location.href); } catch (e) { return false; }
+    var ourOrigin = (BROWSER_PROXY ? new URL(BROWSER_PROXY).origin : location.origin);
+    return u.origin === ourOrigin && u.pathname.indexOf("/browse") !== -1 && u.searchParams.get("url");
+  }
+
+  function extractUrlFromProxyLink(href) {
+    try {
+      var u = new URL(href, location.href);
+      return u.searchParams.get("url") || href;
+    } catch (e) { return href; }
+  }
+
+  function loadInBrowser(url, opts) {
+    opts = opts || {};
+    if (!url || !/^https?:\/\//i.test(url)) return;
+    if (browserUrl) browserUrl.value = url;
+    if (browserLoading) { browserLoading.hidden = false; }
+    browserContent.innerHTML = "";
+    var fetchUrl = proxyUrl(url);
+    var fetchOpts = { method: opts.method || "GET", headers: { Accept: "text/html,application/xhtml+xml,*/*;q=0.8" } };
+    if (opts.method === "POST" && opts.body) {
+      fetchOpts.body = opts.body;
+      if (opts.contentType && !(opts.body instanceof FormData)) fetchOpts.headers["Content-Type"] = opts.contentType;
+    }
+    fetch(fetchUrl, fetchOpts)
+      .then(function (r) { return r.text(); })
+      .then(function (html) {
+        if (browserLoading) browserLoading.hidden = true;
+        browserContent.innerHTML = html;
+      })
+      .catch(function (err) {
+        if (browserLoading) browserLoading.hidden = true;
+        browserContent.innerHTML = "<div class=\"browser-error\"><p>Could not load this page.</p><p>" + (err.message || "Check your connection or try again.") + "</p></div>";
+      });
+  }
+
+  browserContent.addEventListener("click", function (e) {
+    var a = e.target && e.target.closest ? e.target.closest("a") : null;
+    if (!a || !a.href) return;
+    if (isProxyLink(a.href)) {
+      e.preventDefault();
+      loadInBrowser(extractUrlFromProxyLink(a.href));
+    }
+  });
+  browserContent.addEventListener("submit", function (e) {
+    var form = e.target && e.target.tagName === "FORM" ? e.target : null;
+    if (!form) return;
+    var action = (form.getAttribute("action") || "").trim();
+    if (!action) return;
+    var proxyMatch = action.indexOf("/browse?url=") !== -1;
+    try { if (!proxyMatch && action) new URL(action, location.href); } catch (err) { return; }
+    e.preventDefault();
+    var method = (form.method || "get").toLowerCase();
+    var url = action;
+    if (proxyMatch) url = extractUrlFromProxyLink(action);
+    if (method === "get") {
+      var params = new URLSearchParams(new FormData(form));
+      var sep = url.indexOf("?") !== -1 ? "&" : "?";
+      url = url.replace(/#.*$/, "") + sep + params.toString();
+      loadInBrowser(url);
+    } else {
+      var fd = new FormData(form);
+      loadInBrowser(url, { method: "POST", body: fd });
+    }
+  });
 
   function showPanel(page) {
     playPanel.hidden = page !== "play";
     browserPanel.hidden = page !== "browser";
     if (page === "browser") {
       browserPanel.removeAttribute("hidden");
-      if (browserFrame.src === "about:blank" || !browserFrame.src) {
-        var url = (browserUrl.value || "").trim() || "https://www.google.com";
-        browserFrame.src = "/browse?url=" + encodeURIComponent(url);
+      if (!browserContent.innerHTML.trim()) {
+        var url = (browserUrl && browserUrl.value) ? browserUrl.value.trim() : "https://www.google.com";
+        if (!url) url = "https://www.google.com";
+        loadInBrowser(url);
       }
     }
-    links.forEach(function (a) {
+    railLinks.forEach(function (a) {
       a.classList.toggle("rail-link--active", a.getAttribute("data-page") === page);
     });
   }
 
-  links.forEach(function (a) {
+  railLinks.forEach(function (a) {
     a.addEventListener("click", function (e) {
       e.preventDefault();
       showPanel(a.getAttribute("data-page"));
@@ -259,11 +336,17 @@ function setUnlocked() {
     browserForm.addEventListener("submit", function (e) {
       e.preventDefault();
       var raw = (browserUrl.value || "").trim();
-      var url = raw;
-      if (url && !/^https?:\/\//i.test(url)) url = "https://" + url;
-      if (url) {
-        browserFrame.src = "/browse?url=" + encodeURIComponent(url);
+      var url;
+      if (!raw) {
+        url = "https://www.google.com";
+      } else if (/^https?:\/\//i.test(raw)) {
+        url = raw;
+      } else if (/^[a-z0-9-]+\.[a-z]{2,}(\/|$)/i.test(raw) || raw.indexOf(".") !== -1) {
+        url = "https://" + raw;
+      } else {
+        url = "https://www.google.com/search?q=" + encodeURIComponent(raw);
       }
+      loadInBrowser(url);
     });
   }
 })();

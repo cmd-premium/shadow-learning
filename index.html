@@ -186,12 +186,13 @@
       <div id="browser-panel" class="page-panel" hidden>
         <div class="browser-bar">
           <form id="browser-form" class="browser-form" role="search">
-            <input type="text" id="browser-url" class="browser-url" placeholder="Enter URL (e.g. https://google.com)" value="https://www.google.com" autocomplete="off" aria-label="Address" />
+            <input type="text" id="browser-url" class="browser-url" placeholder="Search or enter URL" value="https://www.google.com" autocomplete="off" aria-label="Search or URL" />
             <button type="submit" class="browser-go">Go</button>
           </form>
         </div>
         <div class="browser-frame-wrap">
-          <iframe id="browser-frame" class="browser-frame" title="Browser view" src="about:blank"></iframe>
+          <div id="browser-loading" class="browser-loading" hidden>Loading…</div>
+          <div id="browser-content" class="browser-content"></div>
         </div>
       </div>
 
