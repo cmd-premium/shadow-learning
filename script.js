@@ -223,6 +223,51 @@ function setUnlocked() {
   });
 })();
 
+// ——— Rail: switch between Play and Browser panels ———
+(function railPanels() {
+  var playPanel = document.getElementById("play-panel");
+  var browserPanel = document.getElementById("browser-panel");
+  var browserForm = document.getElementById("browser-form");
+  var browserUrl = document.getElementById("browser-url");
+  var browserFrame = document.getElementById("browser-frame");
+  var links = document.querySelectorAll(".rail-link[data-page]");
+  if (!playPanel || !browserPanel || !browserFrame || !links.length) return;
+
+  function showPanel(page) {
+    playPanel.hidden = page !== "play";
+    browserPanel.hidden = page !== "browser";
+    if (page === "browser") {
+      browserPanel.removeAttribute("hidden");
+      if (browserFrame.src === "about:blank" || !browserFrame.src) {
+        var url = (browserUrl.value || "").trim() || "https://www.google.com";
+        browserFrame.src = "/browse?url=" + encodeURIComponent(url);
+      }
+    }
+    links.forEach(function (a) {
+      a.classList.toggle("rail-link--active", a.getAttribute("data-page") === page);
+    });
+  }
+
+  links.forEach(function (a) {
+    a.addEventListener("click", function (e) {
+      e.preventDefault();
+      showPanel(a.getAttribute("data-page"));
+    });
+  });
+
+  if (browserForm && browserUrl) {
+    browserForm.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var raw = (browserUrl.value || "").trim();
+      var url = raw;
+      if (url && !/^https?:\/\//i.test(url)) url = "https://" + url;
+      if (url) {
+        browserFrame.src = "/browse?url=" + encodeURIComponent(url);
+      }
+    });
+  }
+})();
+
 const gameButtons = document.querySelectorAll(".game-button");
 
 function getGameHtml(id) {

@@ -61,8 +61,36 @@ function serveFile(res, filePath) {
   });
 }
 
+function resolveUrl(base, rel) {
+  try {
+    if (/^\s*javascript\s*:|^\s*#|^\s*data\s*:/i.test(rel.trim())) return rel;
+    return new URL(rel, base).href;
+  } catch (e) {
+    return rel;
+  }
+}
+
+function rewriteHtml(html, baseUrl) {
+  const base = baseUrl.replace(/\/?$/, "/");
+  const proxy = "/browse?url=";
+  return html
+    .replace(/\s(href)\s*=\s*["']([^"']*)["']/gi, (_, attr, val) => {
+      const abs = resolveUrl(base, val);
+      return abs === val ? _ : ` ${attr}="${proxy}${encodeURIComponent(abs)}"`;
+    })
+    .replace(/\s(src)\s*=\s*["']([^"']*)["']/gi, (_, attr, val) => {
+      const abs = resolveUrl(base, val);
+      return abs === val ? _ : ` ${attr}="${proxy}${encodeURIComponent(abs)}"`;
+    })
+    .replace(/\s(action)\s*=\s*["']([^"']*)["']/gi, (_, attr, val) => {
+      const abs = resolveUrl(base, val);
+      return abs === val ? _ : ` ${attr}="${proxy}${encodeURIComponent(abs)}"`;
+    });
+}
+
 const server = http.createServer((req, res) => {
   const url = req.url.split("?")[0];
+  const query = req.url.includes("?") ? new URL(req.url, `http://localhost:${PORT}`).searchParams : null;
 
   // Key-check API
   if (url === "/check-key") {
@@ -172,6 +200,38 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Browse proxy: GET /browse?url=https://... — fetches URL and rewrites HTML links to go through proxy
+  if (url === "/browse" && query && query.get("url")) {
+    let target = query.get("url").trim();
+    if (!/^https?:\/\//i.test(target)) {
+      res.writeHead(400, { "Content-Type": "text/plain" });
+      res.end("Invalid url");
+      return;
+    }
+    const lib = target.startsWith("https") ? https : http;
+    lib.get(target, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }, timeout: 15000 }, (proxyRes) => {
+      const chunks = [];
+      proxyRes.on("data", (c) => chunks.push(c));
+      proxyRes.on("end", () => {
+        const body = Buffer.concat(chunks);
+        const ct = (proxyRes.headers["content-type"] || "").toLowerCase();
+        if (ct.includes("text/html")) {
+          const base = target.replace(/#.*$/, "").replace(/\?.*$/, "").replace(/\/[^/]*$/, "/") || target + "/";
+          const rewritten = rewriteHtml(body.toString("utf8"), base);
+          res.writeHead(proxyRes.statusCode || 200, { "Content-Type": "text/html; charset=utf-8" });
+          res.end(rewritten);
+        } else {
+          res.writeHead(proxyRes.statusCode || 200, { "Content-Type": ct || "application/octet-stream" });
+          res.end(body);
+        }
+      });
+    }).on("error", (e) => {
+      res.writeHead(502, { "Content-Type": "text/plain" });
+      res.end("Could not load: " + (e.message || "error"));
+    });
+    return;
+  }
+
   // Static files
   let filePath = path.join(ROOT, url === "/" ? "index.html" : url);
   if (!path.resolve(filePath).startsWith(path.resolve(ROOT))) {
@@ -194,6 +254,6 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
   console.log("Server: http://localhost:" + PORT);
-  console.log("  Site + /check-key (one key per device)");
+  console.log("  Site + /check-key (one key per device) + /browse (proxy)");
   if (LOG_TO_SHEET_APP_URL) console.log("  /log-key → Google Sheet");
 });

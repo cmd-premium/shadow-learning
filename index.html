@@ -87,7 +87,8 @@
         <span class="rail-pro" aria-hidden="true">Pro</span>
       </div>
       <nav class="rail-nav">
-        <a href="index.html" class="rail-link rail-link--active">Play</a>
+        <a href="#" class="rail-link rail-link--active" data-page="play">Play</a>
+        <a href="#" class="rail-link" data-page="browser" aria-label="Browser" title="Browser">Browser</a>
         <a href="learn.html" class="rail-link" aria-label="Hide" title="Hide">Hide</a>
       </nav>
       <div class="rail-foot">07</div>
@@ -107,6 +108,7 @@
         </div>
       </header>
 
+      <div id="play-panel" class="page-panel page-panel--active">
       <div class="filter-wrap">
         <input
           type="search"
@@ -177,6 +179,19 @@
             </span>
             <span class="game-arrow">→</span>
           </button>
+        </div>
+      </div>
+      </div>
+
+      <div id="browser-panel" class="page-panel" hidden>
+        <div class="browser-bar">
+          <form id="browser-form" class="browser-form" role="search">
+            <input type="text" id="browser-url" class="browser-url" placeholder="Enter URL (e.g. https://google.com)" value="https://www.google.com" autocomplete="off" aria-label="Address" />
+            <button type="submit" class="browser-go">Go</button>
+          </form>
+        </div>
+        <div class="browser-frame-wrap">
+          <iframe id="browser-frame" class="browser-frame" title="Browser view" src="about:blank"></iframe>
         </div>
       </div>
 

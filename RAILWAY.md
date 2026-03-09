@@ -30,7 +30,7 @@ Add:
 
 | Variable | Value |
 |----------|--------|
-| `LOG_TO_SHEET_APP_URL` | `https://script.google.com/macros/s/AKfycbzVsAj13FZsy4LmF2thbGf2_MSWxI4O7WoAIOCoOEZ0jkkjrLsTsG_Vz5qwxUxf79H4/exec` |
+| `LOG_TO_SHEET_APP_URL` | `https://script.google.com/macros/s/AKfycbzXj2zO6GCDVRNsOAgqtdanvzU_HCZ61OrBKHRfPV7OFmeVONHK5_h7zNrlRDJMlGw/exec` |
 
 (Use your real Apps Script Web App URL if different.)
 
