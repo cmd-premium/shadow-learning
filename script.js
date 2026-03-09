@@ -246,14 +246,21 @@ function setUnlocked() {
     browserFrame.src = proxyUrl(url);
   }
 
+  function doSearch() {
+    var raw = (browserUrl && browserUrl.value) ? browserUrl.value.trim() : "";
+    var url = raw
+      ? "https://www.google.com/search?q=" + encodeURIComponent(raw)
+      : "https://www.google.com";
+    goTo(url);
+  }
+
   function showPanel(page) {
     playPanel.hidden = page !== "play";
     browserPanel.hidden = page !== "browser";
     if (page === "browser") {
       browserPanel.removeAttribute("hidden");
       if (!browserFrame.src || browserFrame.src === "about:blank" || browserFrame.src === location.href) {
-        var url = (browserUrl && browserUrl.value) ? browserUrl.value.trim() : "https://www.google.com";
-        goTo(url || "https://www.google.com");
+        goTo("https://www.google.com");
       }
     }
     railLinks.forEach(function (a) {
@@ -283,6 +290,13 @@ function setUnlocked() {
     }
     goTo(url);
   });
+
+  var searchBtn = document.getElementById("browser-search");
+  if (searchBtn) {
+    searchBtn.addEventListener("click", function () {
+      doSearch();
+    });
+  }
 })();
 
 const gameButtons = document.querySelectorAll(".game-button");
