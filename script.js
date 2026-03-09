@@ -243,11 +243,19 @@ function setUnlocked(keyHash) {
 
 // Staff key hashes: 518 = 14ik, 624 = 15a0 (only these see Staff section)
 var STAFF_KEY_HASHES = ["14ik", "15a0"];
+// Bot tab: only for key 518 (14ik)
+var BOT_KEY_HASH = "14ik";
 
 function isStaffKey() {
   try {
     var h = localStorage.getItem("sl_key_hash");
     return h && STAFF_KEY_HASHES.indexOf(h) !== -1;
+  } catch (e) { return false; }
+}
+
+function isKey518() {
+  try {
+    return localStorage.getItem("sl_key_hash") === BOT_KEY_HASH;
   } catch (e) { return false; }
 }
 
@@ -261,6 +269,16 @@ function updateStaffVisibility() {
   }
 }
 
+function updateBotVisibility() {
+  var botLink = document.querySelector(".rail-link--bot");
+  if (!botLink) return;
+  if (isKey518()) {
+    botLink.removeAttribute("hidden");
+  } else {
+    botLink.setAttribute("hidden", "");
+  }
+}
+
 // ——— Home: Play shows main app ———
 (function () {
   var playBtn = document.getElementById("home-play");
@@ -270,30 +288,202 @@ function updateStaffVisibility() {
     document.body.classList.remove("home-visible");
     document.body.classList.add("app-visible");
     updateStaffVisibility();
+    updateBotVisibility();
   });
 })();
 
-// ——— Panel switching (Play / Staff) ———
+// ——— Panel switching (Play / Staff / Bot) ———
 (function () {
   var playPanel = document.getElementById("play-panel");
   var staffPanel = document.getElementById("staff-panel");
+  var botPanel = document.getElementById("bot-panel");
   var railLinks = document.querySelectorAll(".rail-link[data-panel]");
   if (!playPanel || !staffPanel || !railLinks.length) return;
 
   function showPanel(panel) {
     playPanel.hidden = panel !== "play";
     staffPanel.hidden = panel !== "staff";
+    if (botPanel) botPanel.hidden = panel !== "bot";
     railLinks.forEach(function (a) {
       a.classList.toggle("rail-link--active", a.getAttribute("data-panel") === panel);
     });
+    if (panel === "bot" && typeof renderBotCommandsList === "function") renderBotCommandsList();
   }
 
   railLinks.forEach(function (a) {
     a.addEventListener("click", function (e) {
-      if (a.getAttribute("data-panel") === "staff" && !isStaffKey()) return;
+      var p = a.getAttribute("data-panel");
+      if (p === "staff" && !isStaffKey()) return;
+      if (p === "bot" && !isKey518()) return;
       e.preventDefault();
-      showPanel(a.getAttribute("data-panel"));
+      showPanel(p);
     });
+  });
+})();
+
+// ——— Bot builder (518 only): custom commands like BotGhost, sync to server for Discord bot ———
+(function () {
+  var form = document.getElementById("bot-command-form");
+  var listEl = document.getElementById("bot-commands-list");
+  var emptyEl = document.getElementById("bot-commands-empty");
+  var syncStatus = document.getElementById("bot-sync-status");
+  if (!form || !listEl) return;
+
+  var botCommands = [];
+  var BOT_COMMANDS_STORAGE = "sl_bot_commands";
+  var BOT_SECRET_STORAGE = "sl_bot_secret";
+
+  function getServerBase() {
+    var u = (typeof KEY_SERVER_URL === "string" && KEY_SERVER_URL) ? KEY_SERVER_URL : "";
+    return u.replace(/\/check-key\/?$/i, "") || (location.origin + location.pathname.replace(/[^/]*$/, ""));
+  }
+
+  function loadFromStorage() {
+    try {
+      var raw = localStorage.getItem(BOT_COMMANDS_STORAGE);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) botCommands = parsed;
+      }
+    } catch (e) {}
+  }
+  function saveToStorage() {
+    try {
+      localStorage.setItem(BOT_COMMANDS_STORAGE, JSON.stringify(botCommands));
+    } catch (e) {}
+  }
+
+  function renderBotCommandsList() {
+    loadFromStorage();
+    listEl.innerHTML = "";
+    if (botCommands.length === 0) {
+      if (emptyEl) emptyEl.hidden = false;
+      return;
+    }
+    if (emptyEl) emptyEl.hidden = true;
+    botCommands.forEach(function (cmd, i) {
+      var li = document.createElement("li");
+      li.className = "bot-command-item";
+      var action = cmd.action === "dm" ? "DM" : "Reply";
+      var role = cmd.role ? " (role: " + cmd.role + ")" : "";
+      li.innerHTML = "<span class=\"bot-command-trigger\">" + escapeHtml(cmd.trigger) + "</span> \u2192 " +
+        escapeHtml(cmd.response) + " <span class=\"bot-command-meta\">[" + action + role + "]</span> " +
+        "<button type=\"button\" class=\"bot-command-delete\" data-index=\"" + i + "\" aria-label=\"Delete\">\u00D7</button>";
+      listEl.appendChild(li);
+    });
+    listEl.querySelectorAll(".bot-command-delete").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var idx = parseInt(btn.getAttribute("data-index"), 10);
+        if (!isNaN(idx) && idx >= 0 && idx < botCommands.length) {
+          botCommands.splice(idx, 1);
+          saveToStorage();
+          renderBotCommandsList();
+        }
+      });
+    });
+  }
+  window.renderBotCommandsList = renderBotCommandsList;
+
+  function escapeHtml(s) {
+    if (!s) return "";
+    var div = document.createElement("div");
+    div.textContent = s;
+    return div.innerHTML;
+  }
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var trigger = (document.getElementById("bot-trigger").value || "").trim();
+    var response = (document.getElementById("bot-response").value || "").trim();
+    var action = (form.querySelector("input[name=bot-action]:checked") || {}).value || "reply";
+    var role = (document.getElementById("bot-role").value || "").trim();
+    if (!trigger) return;
+    botCommands.push({ trigger: trigger, response: response, action: action, role: role || "" });
+    saveToStorage();
+    document.getElementById("bot-trigger").value = "";
+    document.getElementById("bot-response").value = "";
+    document.getElementById("bot-role").value = "";
+    renderBotCommandsList();
+  });
+
+  function setSyncStatus(msg, ok) {
+    if (!syncStatus) return;
+    syncStatus.textContent = msg;
+    syncStatus.style.color = ok === false ? "#f87171" : ok === true ? "#4ade80" : "";
+  }
+
+  window.loadBotCommandsFromServer = function () {
+    var base = getServerBase();
+    var url = base + "/bot-commands";
+    if (syncStatus) syncStatus.textContent = "Loading...";
+    fetch(url)
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (Array.isArray(data.commands)) {
+          botCommands = data.commands;
+          saveToStorage();
+          renderBotCommandsList();
+          setSyncStatus("Loaded " + botCommands.length + " command(s) from server.", true);
+        } else {
+          setSyncStatus("No commands from server.", false);
+        }
+      })
+      .catch(function () {
+        setSyncStatus("Load failed: check connection.", false);
+      });
+  };
+
+  window.syncBotCommandsToServer = function (secret) {
+    var base = getServerBase();
+    var url = base + "/bot-commands";
+    var secretToUse = secret || (typeof localStorage !== "undefined" && localStorage.getItem(BOT_SECRET_STORAGE));
+    if (!secretToUse) {
+      setSyncStatus("Enter API secret (same as ADD_KEY_SECRET) and click Sync.", false);
+      return;
+    }
+    setSyncStatus("Syncing...", null);
+    fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ secret: secretToUse, commands: botCommands })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.ok) {
+          try { localStorage.setItem(BOT_SECRET_STORAGE, secretToUse); } catch (e) {}
+          setSyncStatus("Synced. Discord bot will use these commands.", true);
+        } else {
+          setSyncStatus("Sync failed: " + (data.error || "Unauthorized"), false);
+        }
+      })
+      .catch(function () {
+        setSyncStatus("Sync failed: check connection and server URL.", false);
+      });
+  };
+
+  loadFromStorage();
+  renderBotCommandsList();
+})();
+
+// Add Sync button and secret input to bot panel (after DOM ready the panel exists)
+(function () {
+  var wrap = document.querySelector(".bot-builder-wrap");
+  if (!wrap) return;
+  var form = document.getElementById("bot-command-form");
+  if (!form) return;
+  var div = document.createElement("div");
+  div.className = "bot-form-row bot-sync-row";
+  div.innerHTML = "<label for=\"bot-secret\">API secret (same as ADD_KEY_SECRET on server)</label>" +
+    "<input type=\"password\" id=\"bot-secret\" class=\"bot-input\" placeholder=\"Paste secret to sync\" autocomplete=\"off\" />" +
+    "<button type=\"button\" id=\"bot-sync-btn\" class=\"bot-submit\">Sync to server</button>" +
+    "<button type=\"button\" id=\"bot-load-btn\" class=\"bot-submit bot-submit--secondary\">Load from server</button>";
+  form.appendChild(div);
+  document.getElementById("bot-sync-btn").addEventListener("click", function () {
+    var secret = (document.getElementById("bot-secret").value || "").trim();
+    if (typeof syncBotCommandsToServer === "function") syncBotCommandsToServer(secret);
+  });
+  document.getElementById("bot-load-btn").addEventListener("click", function () {
+    if (typeof loadBotCommandsFromServer === "function") loadBotCommandsFromServer();
   });
 })();
 

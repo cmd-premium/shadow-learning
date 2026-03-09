@@ -16,6 +16,7 @@ const ADD_KEY_SECRET = process.env.ADD_KEY_SECRET || "";
 const ROOT = __dirname;
 const BINDINGS_FILE = path.join(ROOT, "bindings.json");
 const VALID_KEYS_FILE = path.join(ROOT, "valid-keys.json");
+const BOT_COMMANDS_FILE = path.join(ROOT, "bot-commands.json");
 
 const VALID_KEY_HASHES_BASE = ["15a0", "16qo", "14ik", "11ki"];
 
@@ -50,6 +51,18 @@ function getAllValidKeyHashes() {
   const dynamic = loadValidKeyHashes();
   const set = new Set([...VALID_KEY_HASHES_BASE, ...dynamic]);
   return Array.from(set);
+}
+
+function loadBotCommands() {
+  try {
+    const data = JSON.parse(fs.readFileSync(BOT_COMMANDS_FILE, "utf8"));
+    return Array.isArray(data.commands) ? data.commands : [];
+  } catch (e) {
+    return [];
+  }
+}
+function saveBotCommands(commands) {
+  fs.writeFileSync(BOT_COMMANDS_FILE, JSON.stringify({ commands }, null, 2), "utf8");
 }
 
 const MIMES = {
@@ -247,6 +260,52 @@ const server = http.createServer((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ ok: true, code: normalized }));
     });
+    return;
+  }
+
+  // Bot commands: public GET (for Discord bot), protected POST (for website with secret)
+  if (url === "/bot-commands") {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    if (req.method === "OPTIONS") {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+    if (req.method === "GET") {
+      const commands = loadBotCommands();
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ commands }));
+      return;
+    }
+    if (req.method === "POST" && ADD_KEY_SECRET) {
+      let body = "";
+      req.on("data", (chunk) => { body += chunk; });
+      req.on("end", () => {
+        let secret, commands;
+        try {
+          const data = JSON.parse(body);
+          secret = data.secret;
+          commands = Array.isArray(data.commands) ? data.commands : [];
+        } catch (e) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: false, error: "Invalid request" }));
+          return;
+        }
+        if (secret !== ADD_KEY_SECRET) {
+          res.writeHead(403, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: false, error: "Unauthorized" }));
+          return;
+        }
+        saveBotCommands(commands);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
+      });
+      return;
+    }
+    res.writeHead(404, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ ok: false, error: "Not found" }));
     return;
   }
 

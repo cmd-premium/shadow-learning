@@ -76,7 +76,29 @@ const client = new Client({
   ],
 });
 
+let customCommands = [];
+const BOT_CMDS_BASE = KEY_SERVER_URL.replace(/\/check-key\/?$/i, "");
+
+function fetchCustomCommands() {
+  if (!BOT_CMDS_BASE) return;
+  const url = BOT_CMDS_BASE + "/bot-commands";
+  const req = (url.startsWith("https") ? https : http).get(url, (res) => {
+    let data = "";
+    res.on("data", (c) => { data += c; });
+    res.on("end", () => {
+      try {
+        const json = JSON.parse(data);
+        if (Array.isArray(json.commands)) customCommands = json.commands;
+      } catch (e) {}
+    });
+  });
+  req.on("error", () => {});
+  req.setTimeout(8000, () => req.destroy());
+}
+
 client.once("ready", () => {
+  fetchCustomCommands();
+  setInterval(fetchCustomCommands, 5 * 60 * 1000);
   console.log(`Bot logged in as ${client.user.tag}`);
   console.log(`Staff role name: "${STAFF_ROLE_NAME}"`);
   // Show as Online with a status so it’s visible in the member list
@@ -88,10 +110,26 @@ client.once("ready", () => {
 
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
-  const text = (message.content || "").trim().toLowerCase();
-  if (text !== "!code" && text !== "!getcode" && text !== "!accesscode") return;
-
+  const text = (message.content || "").trim();
+  const textLower = text.toLowerCase();
   const member = message.guild ? message.guild.members.cache.get(message.author.id) : null;
+
+  for (const cmd of customCommands) {
+    const trigger = (cmd.trigger || "").trim().toLowerCase();
+    if (!trigger || textLower !== trigger) continue;
+    const role = (cmd.role || "").trim();
+    if (role && member && !member.roles.cache.some((r) => r.name.toLowerCase() === role.toLowerCase())) continue;
+    const response = (cmd.response || "").trim() || "(no response)";
+    if ((cmd.action || "reply") === "dm") {
+      await message.author.send(response).catch(() => null);
+      if (message.channel && message.channel.type !== 1) await message.reply("Sent you a DM.").catch(() => null);
+    } else {
+      await message.reply(response).catch(() => null);
+    }
+    return;
+  }
+
+  if (textLower !== "!code" && textLower !== "!getcode" && textLower !== "!accesscode") return;
   const hasRole = member && member.roles.cache.some((r) => r.name.toLowerCase() === STAFF_ROLE_NAME.toLowerCase());
 
   if (!hasRole) {

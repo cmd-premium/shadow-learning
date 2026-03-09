@@ -89,6 +89,7 @@
       <nav class="rail-nav">
         <a href="#" class="rail-link rail-link--active" data-panel="play">Play</a>
         <a href="#" class="rail-link rail-link--staff" data-panel="staff" aria-label="Staff" title="Staff" hidden>Staff</a>
+        <a href="#" class="rail-link rail-link--bot" data-panel="bot" aria-label="Bot" title="Bot" hidden>Bot</a>
         <a href="learn.html" class="rail-link" aria-label="Hide" title="Hide">Hide</a>
       </nav>
       <div class="rail-foot">07</div>
@@ -188,6 +189,38 @@
           <h2 class="staff-title">Staff</h2>
           <p class="staff-desc">This section is only visible when you unlock with a staff code (518 or 624).</p>
           <p class="staff-note">Use the Discord bot to generate new access codes for users with the Staff role.</p>
+        </div>
+      </div>
+
+      <div id="bot-panel" class="page-panel" hidden>
+        <div class="bot-builder-wrap">
+          <h2 class="bot-builder-title">Bot commands</h2>
+          <p class="bot-builder-desc">Add custom commands for the Discord bot (like BotGhost). Only visible with code 518.</p>
+          <form id="bot-command-form" class="bot-command-form">
+            <div class="bot-form-row">
+              <label for="bot-trigger">Trigger (e.g. <code>!hello</code>)</label>
+              <input type="text" id="bot-trigger" class="bot-input" placeholder="!hello" required />
+            </div>
+            <div class="bot-form-row">
+              <label for="bot-response">Response</label>
+              <textarea id="bot-response" class="bot-textarea" placeholder="Hey there!" rows="2"></textarea>
+            </div>
+            <div class="bot-form-row bot-form-row--inline">
+              <label><input type="radio" name="bot-action" value="reply" checked /> Reply in channel</label>
+              <label><input type="radio" name="bot-action" value="dm" /> DM user</label>
+            </div>
+            <div class="bot-form-row">
+              <label for="bot-role">Required role (leave empty for everyone)</label>
+              <input type="text" id="bot-role" class="bot-input" placeholder="e.g. Customer" />
+            </div>
+            <button type="submit" class="bot-submit">Add command</button>
+          </form>
+          <div class="bot-commands-list-wrap">
+            <h3 class="bot-commands-list-title">Saved commands</h3>
+            <ul id="bot-commands-list" class="bot-commands-list" aria-live="polite"></ul>
+            <p id="bot-commands-empty" class="bot-commands-empty">No commands yet. Add one above.</p>
+          </div>
+          <p id="bot-sync-status" class="bot-sync-status" aria-live="polite"></p>
         </div>
       </div>
 
