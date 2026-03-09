@@ -89,8 +89,14 @@ function rewriteHtml(html, baseUrl) {
 }
 
 const server = http.createServer((req, res) => {
-  const url = req.url.split("?")[0];
-  const query = req.url.includes("?") ? new URL(req.url, `http://localhost:${PORT}`).searchParams : null;
+  const reqUrl = req.url || "";
+  const pathOnly = reqUrl.split("?")[0].split("#")[0];
+  const url = pathOnly;
+  let query = null;
+  try {
+    const qIndex = reqUrl.indexOf("?");
+    if (qIndex !== -1) query = new URL("http://h" + reqUrl.slice(qIndex)).searchParams;
+  } catch (e) {}
 
   // Key-check API
   if (url === "/check-key") {
@@ -200,12 +206,17 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Browse proxy: GET or POST /browse?url=https://... — fetches URL and rewrites HTML (so search forms work)
-  if (url === "/browse" && query && query.get("url")) {
+  // Browse proxy: GET or POST /browse?url=https://... — fetches URL, follows redirects, rewrites HTML
+  if (url === "/browse") {
     res.setHeader("Access-Control-Allow-Origin", "*");
     if (req.method === "OPTIONS") {
       res.writeHead(204);
       res.end();
+      return;
+    }
+    if (!query || !query.get("url")) {
+      res.writeHead(400, { "Content-Type": "text/plain" });
+      res.end("Missing url parameter. Use /browse?url=https://example.com");
       return;
     }
     let target = query.get("url").trim();
@@ -221,10 +232,21 @@ const server = http.createServer((req, res) => {
     target = targetUrl.href;
     const method = req.method === "POST" ? "POST" : "GET";
     const lib = target.startsWith("https") ? https : http;
+    const REDIRECT_CODES = [301, 302, 303, 307, 308];
+    const MAX_REDIRECTS = 5;
 
-    function doRequest(bodyBytes) {
+    function doRequest(bodyBytes, followUrl, redirectCount) {
+      followUrl = followUrl || target;
+      redirectCount = redirectCount || 0;
+      if (redirectCount > MAX_REDIRECTS) {
+        res.writeHead(502, { "Content-Type": "text/plain" });
+        res.end("Too many redirects");
+        return;
+      }
+      const nextUrl = new URL(followUrl);
+      const nextLib = followUrl.startsWith("https") ? https : http;
       const opts = {
-        method,
+        method: redirectCount === 0 ? method : "GET",
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
           "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -232,25 +254,36 @@ const server = http.createServer((req, res) => {
         },
         timeout: 15000
       };
-      if (method === "POST" && bodyBytes && bodyBytes.length) {
+      if (redirectCount === 0 && method === "POST" && bodyBytes && bodyBytes.length) {
         const ct = req.headers["content-type"] || "application/x-www-form-urlencoded";
         opts.headers["Content-Type"] = ct;
         opts.headers["Content-Length"] = bodyBytes.length;
       }
       const reqOpts = {
-        hostname: targetUrl.hostname,
-        port: targetUrl.port || (targetUrl.protocol === "https:" ? 443 : 80),
-        path: targetUrl.pathname + targetUrl.search,
+        hostname: nextUrl.hostname,
+        port: nextUrl.port || (nextUrl.protocol === "https:" ? 443 : 80),
+        path: nextUrl.pathname + nextUrl.search,
         ...opts
       };
-      const proxyReq = lib.request(reqOpts, (proxyRes) => {
+      const proxyReq = nextLib.request(reqOpts, (proxyRes) => {
+        if (REDIRECT_CODES.indexOf(proxyRes.statusCode) !== -1) {
+          const loc = proxyRes.headers["location"];
+          if (loc) {
+            const resolved = new URL(loc, followUrl).href;
+            if (/^https?:\/\//i.test(resolved)) {
+              doRequest(null, resolved, redirectCount + 1);
+              return;
+            }
+          }
+        }
         const chunks = [];
         proxyRes.on("data", (c) => chunks.push(c));
         proxyRes.on("end", () => {
           const body = Buffer.concat(chunks);
           const ct = (proxyRes.headers["content-type"] || "").toLowerCase();
+          const finalUrl = followUrl;
           if (ct.includes("text/html")) {
-            const base = target.replace(/#.*$/, "").replace(/\?.*$/, "").replace(/\/[^/]*$/, "/") || target + "/";
+            const base = finalUrl.replace(/#.*$/, "").replace(/\?.*$/, "").replace(/\/[^/]*$/, "/") || finalUrl + "/";
             const rewritten = rewriteHtml(body.toString("utf8"), base);
             res.writeHead(proxyRes.statusCode || 200, { "Content-Type": "text/html; charset=utf-8" });
             res.end(rewritten);
@@ -264,7 +297,7 @@ const server = http.createServer((req, res) => {
         res.writeHead(502, { "Content-Type": "text/plain" });
         res.end("Could not load: " + (e.message || "error"));
       });
-      if (method === "POST" && bodyBytes && bodyBytes.length) {
+      if (redirectCount === 0 && method === "POST" && bodyBytes && bodyBytes.length) {
         proxyReq.write(bodyBytes);
       }
       proxyReq.end();
