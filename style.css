@@ -1088,36 +1088,23 @@ body.loading-done .page {
 .browser-url::placeholder {
   color: var(--muted);
 }
-.browser-search,
 .browser-go {
-  padding: 10px 18px;
+  padding: 10px 20px;
   font-family: var(--font);
   font-weight: 600;
   font-size: 14px;
+  color: var(--bg);
+  background: linear-gradient(135deg, var(--premium), #a78bfa);
   border: none;
   border-radius: var(--radius);
   cursor: pointer;
   white-space: nowrap;
   transition: opacity 0.2s, transform 0.1s;
 }
-.browser-search {
-  color: var(--ink);
-  background: var(--border);
-}
-.browser-search:hover {
-  background: rgba(34, 211, 238, 0.2);
-  color: var(--premium);
-}
-.browser-go {
-  color: var(--bg);
-  background: linear-gradient(135deg, var(--premium), #a78bfa);
-}
-.browser-go:hover,
-.browser-search:hover {
+.browser-go:hover {
   opacity: 0.95;
 }
-.browser-go:active,
-.browser-search:active {
+.browser-go:active {
   transform: scale(0.98);
 }
 .browser-frame-wrap {

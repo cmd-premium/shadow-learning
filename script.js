@@ -223,9 +223,8 @@ function setUnlocked() {
   });
 })();
 
-// ——— In-app browser: iframe loads proxy URL so search and any site work ———
+// ——— In-app browser: plain Google (and optional URL) in an iframe ———
 (function inAppBrowser() {
-  var BROWSER_PROXY = "https://shadow-learning-production.up.railway.app";  // "" if site is served from same server
   var playPanel = document.getElementById("play-panel");
   var browserPanel = document.getElementById("browser-panel");
   var browserForm = document.getElementById("browser-form");
@@ -234,35 +233,16 @@ function setUnlocked() {
   var railLinks = document.querySelectorAll(".rail-link[data-page]");
   if (!playPanel || !browserPanel || !browserFrame || !railLinks.length) return;
 
-  function proxyUrl(targetUrl) {
-    var base = BROWSER_PROXY || (location.origin + location.pathname.replace(/[^/]*$/, "") || location.origin + "/");
-    if (base.charAt(base.length - 1) === "/") base = base.slice(0, -1);
-    return base + "/browse?u=" + encodeURIComponent(targetUrl);
-  }
-
   function goTo(url) {
     if (!url || !/^https?:\/\//i.test(url)) return;
     if (browserUrl) browserUrl.value = url;
-    browserFrame.src = proxyUrl(url);
-  }
-
-  function doSearch() {
-    var raw = (browserUrl && browserUrl.value) ? browserUrl.value.trim() : "";
-    var url = raw
-      ? "https://www.google.com/search?q=" + encodeURIComponent(raw)
-      : "https://www.google.com";
-    goTo(url);
+    browserFrame.src = url;
   }
 
   function showPanel(page) {
     playPanel.hidden = page !== "play";
     browserPanel.hidden = page !== "browser";
-    if (page === "browser") {
-      browserPanel.removeAttribute("hidden");
-      if (!browserFrame.src || browserFrame.src === "about:blank" || browserFrame.src === location.href) {
-        goTo("https://www.google.com");
-      }
-    }
+    if (page === "browser") browserPanel.removeAttribute("hidden");
     railLinks.forEach(function (a) {
       a.classList.toggle("rail-link--active", a.getAttribute("data-page") === page);
     });
@@ -290,13 +270,6 @@ function setUnlocked() {
     }
     goTo(url);
   });
-
-  var searchBtn = document.getElementById("browser-search");
-  if (searchBtn) {
-    searchBtn.addEventListener("click", function () {
-      doSearch();
-    });
-  }
 })();
 
 const gameButtons = document.querySelectorAll(".game-button");
