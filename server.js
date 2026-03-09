@@ -8,6 +8,7 @@ const http = require("http");
 const https = require("https");
 const fs = require("fs");
 const path = require("path");
+const urlModule = require("url");
 
 const PORT = process.env.PORT || 3000;
 const LOG_TO_SHEET_APP_URL = process.env.LOG_TO_SHEET_APP_URL || "";
@@ -89,14 +90,9 @@ function rewriteHtml(html, baseUrl) {
 }
 
 const server = http.createServer((req, res) => {
-  const reqUrl = req.url || "";
-  const pathOnly = reqUrl.split("?")[0].split("#")[0];
-  const url = pathOnly;
-  let query = null;
-  try {
-    const qIndex = reqUrl.indexOf("?");
-    if (qIndex !== -1) query = new URL("http://h" + reqUrl.slice(qIndex)).searchParams;
-  } catch (e) {}
+  const parsedUrl = urlModule.parse(req.url || "", true);
+  const url = parsedUrl.pathname || "/";
+  const query = parsedUrl.query || {};
 
   // Key-check API
   if (url === "/check-key") {
@@ -214,20 +210,21 @@ const server = http.createServer((req, res) => {
       res.end();
       return;
     }
-    if (!query || !query.get("url")) {
+    const urlParam = query && (query.url || query.URL);
+    if (!urlParam || typeof urlParam !== "string") {
       res.writeHead(400, { "Content-Type": "text/plain" });
       res.end("Missing url parameter. Use /browse?url=https://example.com");
       return;
     }
-    let target = query.get("url").trim();
+    let target = urlParam.trim();
     if (!/^https?:\/\//i.test(target)) {
       res.writeHead(400, { "Content-Type": "text/plain" });
       res.end("Invalid url");
       return;
     }
     const targetUrl = new URL(target);
-    query.forEach((value, key) => {
-      if (key !== "url") targetUrl.searchParams.set(key, value);
+    Object.keys(query || {}).forEach((key) => {
+      if (key !== "url" && key !== "URL") targetUrl.searchParams.set(key, query[key]);
     });
     target = targetUrl.href;
     const method = req.method === "POST" ? "POST" : "GET";
