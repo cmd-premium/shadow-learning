@@ -179,26 +179,52 @@ function setUnlocked() {
       })
     })
       .then(function (res) {
-        return res.json().catch(function () { return {}; }).then(function (data) {
+        return res.text().then(function (text) {
+          var data = {};
+          try {
+            if (text && text.trim()) data = JSON.parse(text);
+          } catch (e) {}
           return { ok: res.ok, status: res.status, data: data };
         });
       })
       .then(function (result) {
-        if (result.status >= 500 || (result.data && result.data.ok === true)) {
-          unlock();
-          return;
-        }
-        if (result.data && result.data.error) {
-          logToSheet("fail", result.data.error);
-          input.classList.add("error");
+        if (!result) {
           if (errorEl) {
-            errorEl.textContent = result.data.error;
+            errorEl.textContent = "Could not verify key. Try again or check your connection.";
             errorEl.hidden = false;
           }
           input.focus();
-        } else {
-          unlock();
+          return;
         }
+        var serverOk = result.data && result.data.ok === true;
+        var serverError = result.data && result.data.error;
+        if (result.status >= 500) {
+          unlock();
+          return;
+        }
+        if (serverOk) {
+          unlock();
+          return;
+        }
+        if (serverError) {
+          logToSheet("fail", serverError);
+          input.classList.add("error");
+          if (errorEl) {
+            errorEl.textContent = serverError;
+            errorEl.hidden = false;
+          }
+          input.focus();
+          return;
+        }
+        if (result.status >= 400) {
+          if (errorEl) {
+            errorEl.textContent = "Could not verify key. Try again or check your connection.";
+            errorEl.hidden = false;
+          }
+          input.focus();
+          return;
+        }
+        unlock();
       })
       .catch(function () {
         unlock();
