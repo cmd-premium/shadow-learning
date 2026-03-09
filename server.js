@@ -202,6 +202,12 @@ const server = http.createServer((req, res) => {
 
   // Browse proxy: GET or POST /browse?url=https://... — fetches URL and rewrites HTML (so search forms work)
   if (url === "/browse" && query && query.get("url")) {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    if (req.method === "OPTIONS") {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
     let target = query.get("url").trim();
     if (!/^https?:\/\//i.test(target)) {
       res.writeHead(400, { "Content-Type": "text/plain" });

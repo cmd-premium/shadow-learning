@@ -225,7 +225,7 @@ function setUnlocked() {
 
 // ——— In-app browser: fetch pages via proxy and show in our content area (no iframe) ———
 (function inAppBrowser() {
-  var BROWSER_PROXY = "";  // Same-origin; or set to "https://shadow-learning-production.up.railway.app" if site is on GitHub Pages
+  var BROWSER_PROXY = "https://shadow-learning-production.up.railway.app";  // Leave "" if site is served from same server (e.g. Railway)
   var playPanel = document.getElementById("play-panel");
   var browserPanel = document.getElementById("browser-panel");
   var browserForm = document.getElementById("browser-form");
@@ -237,6 +237,7 @@ function setUnlocked() {
 
   function proxyUrl(targetUrl) {
     var base = (BROWSER_PROXY || (location.origin + location.pathname.replace(/[^/]*$/, ""))) || "";
+    if (base && base.charAt(base.length - 1) === "/") base = base.slice(0, -1);
     return base + "/browse?url=" + encodeURIComponent(targetUrl);
   }
 
@@ -267,15 +268,29 @@ function setUnlocked() {
       fetchOpts.body = opts.body;
       if (opts.contentType && !(opts.body instanceof FormData)) fetchOpts.headers["Content-Type"] = opts.contentType;
     }
+    var timeout = 20000;
+    var controller = new AbortController();
+    var timeoutId = setTimeout(function () { controller.abort(); }, timeout);
+    fetchOpts.signal = controller.signal;
     fetch(fetchUrl, fetchOpts)
-      .then(function (r) { return r.text(); })
+      .then(function (r) {
+        clearTimeout(timeoutId);
+        var ct = (r.headers.get("content-type") || "").toLowerCase();
+        if (!ct.includes("text/html") && !ct.includes("text/plain")) {
+          if (browserLoading) browserLoading.hidden = true;
+          throw new Error("This address is not a web page (e.g. image or file). Try a different URL.");
+        }
+        return r.text();
+      })
       .then(function (html) {
         if (browserLoading) browserLoading.hidden = true;
         browserContent.innerHTML = html;
       })
       .catch(function (err) {
+        clearTimeout(timeoutId);
         if (browserLoading) browserLoading.hidden = true;
-        browserContent.innerHTML = "<div class=\"browser-error\"><p>Could not load this page.</p><p>" + (err.message || "Check your connection or try again.") + "</p></div>";
+        var msg = err.name === "AbortError" ? "Request took too long. Try again or use a different site." : (err.message || "Check your connection or try again.");
+        browserContent.innerHTML = "<div class=\"browser-error\"><p>Could not load this page.</p><p>" + msg + "</p><p>Tip: If this site is on GitHub Pages, set <code>BROWSER_PROXY</code> in script.js to your Railway URL.</p></div>";
       });
   }
 
