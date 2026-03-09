@@ -223,116 +223,37 @@ function setUnlocked() {
   });
 })();
 
-// ——— In-app browser: fetch pages via proxy and show in our content area (no iframe) ———
+// ——— In-app browser: iframe loads proxy URL so search and any site work ———
 (function inAppBrowser() {
-  var BROWSER_PROXY = "https://shadow-learning-production.up.railway.app";  // Leave "" if site is served from same server (e.g. Railway)
+  var BROWSER_PROXY = "https://shadow-learning-production.up.railway.app";  // "" if site is served from same server
   var playPanel = document.getElementById("play-panel");
   var browserPanel = document.getElementById("browser-panel");
   var browserForm = document.getElementById("browser-form");
   var browserUrl = document.getElementById("browser-url");
-  var browserContent = document.getElementById("browser-content");
-  var browserLoading = document.getElementById("browser-loading");
+  var browserFrame = document.getElementById("browser-frame");
   var railLinks = document.querySelectorAll(".rail-link[data-page]");
-  if (!playPanel || !browserPanel || !browserContent || !railLinks.length) return;
+  if (!playPanel || !browserPanel || !browserFrame || !railLinks.length) return;
 
   function proxyUrl(targetUrl) {
-    var base = (BROWSER_PROXY || (location.origin + location.pathname.replace(/[^/]*$/, ""))) || "";
-    if (base && base.charAt(base.length - 1) === "/") base = base.slice(0, -1);
+    var base = BROWSER_PROXY || (location.origin + location.pathname.replace(/[^/]*$/, "") || location.origin + "/");
+    if (base.charAt(base.length - 1) === "/") base = base.slice(0, -1);
     return base + "/browse?url=" + encodeURIComponent(targetUrl);
   }
 
-  function isProxyLink(href) {
-    if (!href) return false;
-    var u;
-    try { u = new URL(href, location.href); } catch (e) { return false; }
-    var ourOrigin = (BROWSER_PROXY ? new URL(BROWSER_PROXY).origin : location.origin);
-    return u.origin === ourOrigin && u.pathname.indexOf("/browse") !== -1 && u.searchParams.get("url");
-  }
-
-  function extractUrlFromProxyLink(href) {
-    try {
-      var u = new URL(href, location.href);
-      return u.searchParams.get("url") || href;
-    } catch (e) { return href; }
-  }
-
-  function loadInBrowser(url, opts) {
-    opts = opts || {};
+  function goTo(url) {
     if (!url || !/^https?:\/\//i.test(url)) return;
     if (browserUrl) browserUrl.value = url;
-    if (browserLoading) { browserLoading.hidden = false; }
-    browserContent.innerHTML = "";
-    var fetchUrl = proxyUrl(url);
-    var fetchOpts = { method: opts.method || "GET", headers: { Accept: "text/html,application/xhtml+xml,*/*;q=0.8" } };
-    if (opts.method === "POST" && opts.body) {
-      fetchOpts.body = opts.body;
-      if (opts.contentType && !(opts.body instanceof FormData)) fetchOpts.headers["Content-Type"] = opts.contentType;
-    }
-    var timeout = 20000;
-    var controller = new AbortController();
-    var timeoutId = setTimeout(function () { controller.abort(); }, timeout);
-    fetchOpts.signal = controller.signal;
-    fetch(fetchUrl, fetchOpts)
-      .then(function (r) {
-        clearTimeout(timeoutId);
-        var ct = (r.headers.get("content-type") || "").toLowerCase();
-        if (!ct.includes("text/html") && !ct.includes("text/plain")) {
-          if (browserLoading) browserLoading.hidden = true;
-          throw new Error("This address is not a web page (e.g. image or file). Try a different URL.");
-        }
-        return r.text();
-      })
-      .then(function (html) {
-        if (browserLoading) browserLoading.hidden = true;
-        browserContent.innerHTML = html;
-      })
-      .catch(function (err) {
-        clearTimeout(timeoutId);
-        if (browserLoading) browserLoading.hidden = true;
-        var msg = err.name === "AbortError" ? "Request took too long. Try again or use a different site." : (err.message || "Check your connection or try again.");
-        browserContent.innerHTML = "<div class=\"browser-error\"><p>Could not load this page.</p><p>" + msg + "</p><p>Tip: If this site is on GitHub Pages, set <code>BROWSER_PROXY</code> in script.js to your Railway URL.</p></div>";
-      });
+    browserFrame.src = proxyUrl(url);
   }
-
-  browserContent.addEventListener("click", function (e) {
-    var a = e.target && e.target.closest ? e.target.closest("a") : null;
-    if (!a || !a.href) return;
-    if (isProxyLink(a.href)) {
-      e.preventDefault();
-      loadInBrowser(extractUrlFromProxyLink(a.href));
-    }
-  });
-  browserContent.addEventListener("submit", function (e) {
-    var form = e.target && e.target.tagName === "FORM" ? e.target : null;
-    if (!form) return;
-    var action = (form.getAttribute("action") || "").trim();
-    if (!action) return;
-    var proxyMatch = action.indexOf("/browse?url=") !== -1;
-    try { if (!proxyMatch && action) new URL(action, location.href); } catch (err) { return; }
-    e.preventDefault();
-    var method = (form.method || "get").toLowerCase();
-    var url = action;
-    if (proxyMatch) url = extractUrlFromProxyLink(action);
-    if (method === "get") {
-      var params = new URLSearchParams(new FormData(form));
-      var sep = url.indexOf("?") !== -1 ? "&" : "?";
-      url = url.replace(/#.*$/, "") + sep + params.toString();
-      loadInBrowser(url);
-    } else {
-      var fd = new FormData(form);
-      loadInBrowser(url, { method: "POST", body: fd });
-    }
-  });
 
   function showPanel(page) {
     playPanel.hidden = page !== "play";
     browserPanel.hidden = page !== "browser";
     if (page === "browser") {
       browserPanel.removeAttribute("hidden");
-      if (!browserContent.innerHTML.trim()) {
+      if (!browserFrame.src || browserFrame.src === "about:blank" || browserFrame.src === location.href) {
         var url = (browserUrl && browserUrl.value) ? browserUrl.value.trim() : "https://www.google.com";
-        if (!url) url = "https://www.google.com";
-        loadInBrowser(url);
+        goTo(url || "https://www.google.com");
       }
     }
     railLinks.forEach(function (a) {
@@ -347,23 +268,21 @@ function setUnlocked() {
     });
   });
 
-  if (browserForm && browserUrl) {
-    browserForm.addEventListener("submit", function (e) {
-      e.preventDefault();
-      var raw = (browserUrl.value || "").trim();
-      var url;
-      if (!raw) {
-        url = "https://www.google.com";
-      } else if (/^https?:\/\//i.test(raw)) {
-        url = raw;
-      } else if (/^[a-z0-9-]+\.[a-z]{2,}(\/|$)/i.test(raw) || raw.indexOf(".") !== -1) {
-        url = "https://" + raw;
-      } else {
-        url = "https://www.google.com/search?q=" + encodeURIComponent(raw);
-      }
-      loadInBrowser(url);
-    });
-  }
+  browserForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var raw = (browserUrl.value || "").trim();
+    var url;
+    if (!raw) {
+      url = "https://www.google.com";
+    } else if (/^https?:\/\//i.test(raw)) {
+      url = raw;
+    } else if (raw.indexOf(".") !== -1 && /^[a-z0-9-.]+\.[a-z]{2,}(\/|$)/i.test(raw.split("/")[0])) {
+      url = "https://" + raw;
+    } else {
+      url = "https://www.google.com/search?q=" + encodeURIComponent(raw);
+    }
+    goTo(url);
+  });
 })();
 
 const gameButtons = document.querySelectorAll(".game-button");
