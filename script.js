@@ -59,10 +59,11 @@ function isUnlocked() {
   }
 }
 
-function setUnlocked() {
+function setUnlocked(keyHash) {
   try {
     localStorage.setItem("sl_unlocked", "1");
     localStorage.setItem("sl_fp", getDeviceFingerprint());
+    if (keyHash) localStorage.setItem("sl_key_hash", keyHash);
   } catch (e) {}
 }
 
@@ -86,6 +87,7 @@ function setUnlocked() {
       // Require key every time loading screen shows (no persistent unlock)
       localStorage.removeItem("sl_unlocked");
       localStorage.removeItem("sl_fp");
+      localStorage.removeItem("sl_key_hash");
     } catch (e) {}
     if (isUnlocked()) {
       document.body.classList.add("home-visible");
@@ -141,7 +143,10 @@ function setUnlocked() {
       }).catch(function () {});
     }
 
-    if (ACCESS_KEY_HASHES.indexOf(keyHash) === -1) {
+    var serverUrl = (typeof KEY_SERVER_URL === "string" && KEY_SERVER_URL.trim()) ? KEY_SERVER_URL.trim() : "";
+    var useServer = !!serverUrl;
+
+    if (!useServer && ACCESS_KEY_HASHES.indexOf(keyHash) === -1) {
       logToSheet("fail", "Invalid key");
       input.classList.add("error");
       if (errorEl) {
@@ -154,12 +159,11 @@ function setUnlocked() {
 
     function unlock() {
       logToSheet("success");
-      setUnlocked();
+      setUnlocked(keyHash);
       document.body.classList.remove("key-gate-visible");
       document.body.classList.add("home-visible");
     }
 
-    var serverUrl = (typeof KEY_SERVER_URL === "string" && KEY_SERVER_URL.trim()) ? KEY_SERVER_URL.trim() : "";
     if (!serverUrl) {
       unlock();
       return;
@@ -200,6 +204,7 @@ function setUnlocked() {
         var serverError = result.data && result.data.error;
         if (serverOk) {
           unlock();
+          updateStaffVisibility();
           return;
         }
         if (serverError) {
@@ -236,6 +241,26 @@ function setUnlocked() {
   });
 })();
 
+// Staff key hashes: 518 = 14ik, 624 = 15a0 (only these see Staff section)
+var STAFF_KEY_HASHES = ["14ik", "15a0"];
+
+function isStaffKey() {
+  try {
+    var h = localStorage.getItem("sl_key_hash");
+    return h && STAFF_KEY_HASHES.indexOf(h) !== -1;
+  } catch (e) { return false; }
+}
+
+function updateStaffVisibility() {
+  var staffLink = document.querySelector(".rail-link--staff");
+  if (!staffLink) return;
+  if (isStaffKey()) {
+    staffLink.removeAttribute("hidden");
+  } else {
+    staffLink.setAttribute("hidden", "");
+  }
+}
+
 // ——— Home: Play shows main app ———
 (function () {
   var playBtn = document.getElementById("home-play");
@@ -244,6 +269,31 @@ function setUnlocked() {
     e.preventDefault();
     document.body.classList.remove("home-visible");
     document.body.classList.add("app-visible");
+    updateStaffVisibility();
+  });
+})();
+
+// ——— Panel switching (Play / Staff) ———
+(function () {
+  var playPanel = document.getElementById("play-panel");
+  var staffPanel = document.getElementById("staff-panel");
+  var railLinks = document.querySelectorAll(".rail-link[data-panel]");
+  if (!playPanel || !staffPanel || !railLinks.length) return;
+
+  function showPanel(panel) {
+    playPanel.hidden = panel !== "play";
+    staffPanel.hidden = panel !== "staff";
+    railLinks.forEach(function (a) {
+      a.classList.toggle("rail-link--active", a.getAttribute("data-panel") === panel);
+    });
+  }
+
+  railLinks.forEach(function (a) {
+    a.addEventListener("click", function (e) {
+      if (a.getAttribute("data-panel") === "staff" && !isStaffKey()) return;
+      e.preventDefault();
+      showPanel(a.getAttribute("data-panel"));
+    });
   });
 })();
 

@@ -30,7 +30,8 @@ Add:
 
 | Variable | Value |
 |----------|--------|
-| `LOG_TO_SHEET_APP_URL` | `https://script.google.com/macros/s/AKfycbzXj2zO6GCDVRNsOAgqtdanvzU_HCZ61OrBKHRfPV7OFmeVONHK5_h7zNrlRDJMlGw/exec` |
+| `LOG_TO_SHEET_APP_URL` | Your Google Apps Script Web App URL (for key logging) |
+| `ADD_KEY_SECRET` | A long random secret (e.g. `openssl rand -hex 32`). Same value goes in the Discord bot’s `.env` so it can register new codes. |
 
 (Use your real Apps Script Web App URL if different.)
 

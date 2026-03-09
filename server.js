@@ -12,10 +12,45 @@ const urlModule = require("url");
 
 const PORT = process.env.PORT || 3000;
 const LOG_TO_SHEET_APP_URL = process.env.LOG_TO_SHEET_APP_URL || "";
+const ADD_KEY_SECRET = process.env.ADD_KEY_SECRET || "";
 const ROOT = __dirname;
 const BINDINGS_FILE = path.join(ROOT, "bindings.json");
+const VALID_KEYS_FILE = path.join(ROOT, "valid-keys.json");
 
-const VALID_KEY_HASHES = ["15a0", "16qo", "14ik", "11ki"];
+const VALID_KEY_HASHES_BASE = ["15a0", "16qo", "14ik", "11ki"];
+
+function normalizeKey(s) {
+  let str = String(s).trim().replace(/\s+/g, "");
+  const full = "\uFF10\uFF11\uFF12\uFF13\uFF14\uFF15\uFF16\uFF17\uFF18\uFF19";
+  const half = "0123456789";
+  for (let i = 0; i < full.length; i++) str = str.replace(new RegExp(full[i], "g"), half[i]);
+  return str;
+}
+function hashKey(s) {
+  let h = 0;
+  const str = normalizeKey(s);
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) - h) + str.charCodeAt(i) | 0;
+  }
+  return (h >>> 0).toString(36);
+}
+
+function loadValidKeyHashes() {
+  try {
+    const data = JSON.parse(fs.readFileSync(VALID_KEYS_FILE, "utf8"));
+    return Array.isArray(data.hashes) ? data.hashes : [];
+  } catch (e) {
+    return [];
+  }
+}
+function saveValidKeyHashes(hashes) {
+  fs.writeFileSync(VALID_KEYS_FILE, JSON.stringify({ hashes }, null, 2), "utf8");
+}
+function getAllValidKeyHashes() {
+  const dynamic = loadValidKeyHashes();
+  const set = new Set([...VALID_KEY_HASHES_BASE, ...dynamic]);
+  return Array.from(set);
+}
 
 const MIMES = {
   ".html": "text/html",
@@ -133,7 +168,8 @@ const server = http.createServer((req, res) => {
       }
       fingerprint = fingerprint || "unknown";
 
-      if (VALID_KEY_HASHES.indexOf(keyHash) === -1) {
+      const validHashes = getAllValidKeyHashes();
+      if (validHashes.indexOf(keyHash) === -1) {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ok: false, error: "Invalid key." }));
         return;
@@ -156,6 +192,60 @@ const server = http.createServer((req, res) => {
 
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ ok: true }));
+    });
+    return;
+  }
+
+  // Admin: add a new key (used by Discord bot). Requires ADD_KEY_SECRET.
+  if (url === "/admin/add-key" && ADD_KEY_SECRET) {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    if (req.method === "OPTIONS") {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+    if (req.method !== "POST") {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: false, error: "Not found" }));
+      return;
+    }
+    let body = "";
+    req.on("data", (chunk) => { body += chunk; });
+    req.on("end", () => {
+      let secret, code;
+      try {
+        const data = JSON.parse(body);
+        secret = data.secret;
+        code = data.code != null ? String(data.code).trim() : "";
+      } catch (e) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: false, error: "Invalid request" }));
+        return;
+      }
+      if (secret !== ADD_KEY_SECRET) {
+        res.writeHead(403, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: false, error: "Unauthorized" }));
+        return;
+      }
+      const normalized = normalizeKey(code);
+      if (!normalized) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: false, error: "Missing code" }));
+        return;
+      }
+      const keyHash = hashKey(normalized);
+      const hashes = loadValidKeyHashes();
+      if (hashes.indexOf(keyHash) !== -1) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, code: normalized, message: "Code already registered" }));
+        return;
+      }
+      hashes.push(keyHash);
+      saveValidKeyHashes(hashes);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true, code: normalized }));
     });
     return;
   }

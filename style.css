@@ -1058,6 +1058,25 @@ body.loading-done .page {
   display: none !important;
 }
 
+/* ——— Staff panel ——— */
+.staff-wrap {
+  padding: 24px 0;
+}
+.staff-title {
+  font-family: var(--font);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0 0 12px;
+}
+.staff-desc,
+.staff-note {
+  font-family: var(--font);
+  font-size: 0.95rem;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+
 /* ——— Deck ——— */
 .deck {
   border-top: 1px solid var(--border);

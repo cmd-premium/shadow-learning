@@ -87,7 +87,8 @@
         <span class="rail-pro" aria-hidden="true">Pro</span>
       </div>
       <nav class="rail-nav">
-        <a href="#" class="rail-link rail-link--active">Play</a>
+        <a href="#" class="rail-link rail-link--active" data-panel="play">Play</a>
+        <a href="#" class="rail-link rail-link--staff" data-panel="staff" aria-label="Staff" title="Staff" hidden>Staff</a>
         <a href="learn.html" class="rail-link" aria-label="Hide" title="Hide">Hide</a>
       </nav>
       <div class="rail-foot">07</div>
@@ -180,6 +181,14 @@
           </button>
         </div>
       </div>
+      </div>
+
+      <div id="staff-panel" class="page-panel" hidden>
+        <div class="staff-wrap">
+          <h2 class="staff-title">Staff</h2>
+          <p class="staff-desc">This section is only visible when you unlock with a staff code (518 or 624).</p>
+          <p class="staff-note">Use the Discord bot to generate new access codes for users with the Staff role.</p>
+        </div>
       </div>
 
       <footer class="page-foot">
