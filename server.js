@@ -202,7 +202,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Browse proxy: GET or POST /browse?url=https://... — fetches URL, follows redirects, rewrites HTML
+  // Browse proxy: GET or POST /browse?u= or ?url= — fetches URL, follows redirects, rewrites HTML
   if (url === "/browse") {
     res.setHeader("Access-Control-Allow-Origin", "*");
     if (req.method === "OPTIONS") {
@@ -210,16 +210,24 @@ const server = http.createServer((req, res) => {
       res.end();
       return;
     }
-    const urlParam = query && (query.u || query.url || query.URL);
-    if (!urlParam || typeof urlParam !== "string") {
+    const rawQuery = (parsedUrl.search && String(parsedUrl.search).replace(/^\?/, "")) || "";
+    let target = null;
+    const tryParam = (name) => {
+      const re = new RegExp("(?:^|&)" + name + "=([^&]*)");
+      const m = rawQuery.match(re);
+      if (m) {
+        try {
+          const v = decodeURIComponent(m[1].replace(/\+/g, " "));
+          if (/^https?:\/\//i.test(v)) return v;
+        } catch (e) {}
+      }
+      return null;
+    };
+    target = tryParam("u") || tryParam("url") || tryParam("URL") || (query && (query.u || query.url || query.URL));
+    if (typeof target === "string") target = target.trim();
+    if (!target || !/^https?:\/\//i.test(target)) {
       res.writeHead(400, { "Content-Type": "text/plain" });
       res.end("Missing url parameter. Use /browse?u=https://example.com");
-      return;
-    }
-    let target = urlParam.trim();
-    if (!/^https?:\/\//i.test(target)) {
-      res.writeHead(400, { "Content-Type": "text/plain" });
-      res.end("Invalid url");
       return;
     }
     const targetUrl = new URL(target);
