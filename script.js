@@ -237,7 +237,7 @@ function setUnlocked() {
   function proxyUrl(targetUrl) {
     var base = BROWSER_PROXY || (location.origin + location.pathname.replace(/[^/]*$/, "") || location.origin + "/");
     if (base.charAt(base.length - 1) === "/") base = base.slice(0, -1);
-    return base + "/browse?url=" + encodeURIComponent(targetUrl);
+    return base + "/browse?u=" + encodeURIComponent(targetUrl);
   }
 
   function goTo(url) {

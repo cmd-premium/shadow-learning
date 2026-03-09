@@ -73,7 +73,7 @@ function resolveUrl(base, rel) {
 
 function rewriteHtml(html, baseUrl) {
   const base = baseUrl.replace(/\/?$/, "/");
-  const proxy = "/browse?url=";
+  const proxy = "/browse?u=";
   return html
     .replace(/\s(href)\s*=\s*["']([^"']*)["']/gi, (_, attr, val) => {
       const abs = resolveUrl(base, val);
@@ -210,10 +210,10 @@ const server = http.createServer((req, res) => {
       res.end();
       return;
     }
-    const urlParam = query && (query.url || query.URL);
+    const urlParam = query && (query.u || query.url || query.URL);
     if (!urlParam || typeof urlParam !== "string") {
       res.writeHead(400, { "Content-Type": "text/plain" });
-      res.end("Missing url parameter. Use /browse?url=https://example.com");
+      res.end("Missing url parameter. Use /browse?u=https://example.com");
       return;
     }
     let target = urlParam.trim();
@@ -224,7 +224,7 @@ const server = http.createServer((req, res) => {
     }
     const targetUrl = new URL(target);
     Object.keys(query || {}).forEach((key) => {
-      if (key !== "url" && key !== "URL") targetUrl.searchParams.set(key, query[key]);
+      if (key !== "u" && key !== "url" && key !== "URL") targetUrl.searchParams.set(key, query[key]);
     });
     target = targetUrl.href;
     const method = req.method === "POST" ? "POST" : "GET";
