@@ -329,8 +329,7 @@ function setUnlocked() {
     });
   });
 
-  browserForm.addEventListener("submit", function (e) {
-    e.preventDefault();
+  function doGo() {
     var raw = (browserUrl.value || "").trim();
     var url;
     if (!raw) url = "https://www.google.com";
@@ -338,6 +337,18 @@ function setUnlocked() {
     else if (raw.indexOf(".") !== -1 && /^[a-z0-9-.]+\.[a-z]{2,}(\/|$)/i.test(raw.split("/")[0])) url = "https://" + raw;
     else url = "https://www.google.com/search?q=" + encodeURIComponent(raw);
     loadInBrowser(url);
+  }
+
+  browserForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    doGo();
+  });
+
+  browserUrl.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      doGo();
+    }
   });
 })();
 
