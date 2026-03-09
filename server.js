@@ -200,7 +200,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Browse proxy: GET /browse?url=https://... — fetches URL and rewrites HTML links to go through proxy
+  // Browse proxy: GET or POST /browse?url=https://... — fetches URL and rewrites HTML (so search forms work)
   if (url === "/browse" && query && query.get("url")) {
     let target = query.get("url").trim();
     if (!/^https?:\/\//i.test(target)) {
@@ -208,27 +208,69 @@ const server = http.createServer((req, res) => {
       res.end("Invalid url");
       return;
     }
-    const lib = target.startsWith("https") ? https : http;
-    lib.get(target, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }, timeout: 15000 }, (proxyRes) => {
-      const chunks = [];
-      proxyRes.on("data", (c) => chunks.push(c));
-      proxyRes.on("end", () => {
-        const body = Buffer.concat(chunks);
-        const ct = (proxyRes.headers["content-type"] || "").toLowerCase();
-        if (ct.includes("text/html")) {
-          const base = target.replace(/#.*$/, "").replace(/\?.*$/, "").replace(/\/[^/]*$/, "/") || target + "/";
-          const rewritten = rewriteHtml(body.toString("utf8"), base);
-          res.writeHead(proxyRes.statusCode || 200, { "Content-Type": "text/html; charset=utf-8" });
-          res.end(rewritten);
-        } else {
-          res.writeHead(proxyRes.statusCode || 200, { "Content-Type": ct || "application/octet-stream" });
-          res.end(body);
-        }
-      });
-    }).on("error", (e) => {
-      res.writeHead(502, { "Content-Type": "text/plain" });
-      res.end("Could not load: " + (e.message || "error"));
+    const targetUrl = new URL(target);
+    query.forEach((value, key) => {
+      if (key !== "url") targetUrl.searchParams.set(key, value);
     });
+    target = targetUrl.href;
+    const method = req.method === "POST" ? "POST" : "GET";
+    const lib = target.startsWith("https") ? https : http;
+
+    function doRequest(bodyBytes) {
+      const opts = {
+        method,
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9"
+        },
+        timeout: 15000
+      };
+      if (method === "POST" && bodyBytes && bodyBytes.length) {
+        const ct = req.headers["content-type"] || "application/x-www-form-urlencoded";
+        opts.headers["Content-Type"] = ct;
+        opts.headers["Content-Length"] = bodyBytes.length;
+      }
+      const reqOpts = {
+        hostname: targetUrl.hostname,
+        port: targetUrl.port || (targetUrl.protocol === "https:" ? 443 : 80),
+        path: targetUrl.pathname + targetUrl.search,
+        ...opts
+      };
+      const proxyReq = lib.request(reqOpts, (proxyRes) => {
+        const chunks = [];
+        proxyRes.on("data", (c) => chunks.push(c));
+        proxyRes.on("end", () => {
+          const body = Buffer.concat(chunks);
+          const ct = (proxyRes.headers["content-type"] || "").toLowerCase();
+          if (ct.includes("text/html")) {
+            const base = target.replace(/#.*$/, "").replace(/\?.*$/, "").replace(/\/[^/]*$/, "/") || target + "/";
+            const rewritten = rewriteHtml(body.toString("utf8"), base);
+            res.writeHead(proxyRes.statusCode || 200, { "Content-Type": "text/html; charset=utf-8" });
+            res.end(rewritten);
+          } else {
+            res.writeHead(proxyRes.statusCode || 200, { "Content-Type": ct || "application/octet-stream" });
+            res.end(body);
+          }
+        });
+      });
+      proxyReq.on("error", (e) => {
+        res.writeHead(502, { "Content-Type": "text/plain" });
+        res.end("Could not load: " + (e.message || "error"));
+      });
+      if (method === "POST" && bodyBytes && bodyBytes.length) {
+        proxyReq.write(bodyBytes);
+      }
+      proxyReq.end();
+    }
+
+    if (method === "POST") {
+      let body = [];
+      req.on("data", (chunk) => body.push(chunk));
+      req.on("end", () => doRequest(Buffer.concat(body)));
+    } else {
+      doRequest(null);
+    }
     return;
   }
 
