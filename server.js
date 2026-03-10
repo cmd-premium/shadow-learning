@@ -13,11 +13,14 @@ const crypto = require("crypto");
 
 const PORT = process.env.PORT || 3000;
 const LOG_TO_SHEET_APP_URL = process.env.LOG_TO_SHEET_APP_URL || "";
-const CODES_PAGE_SECRET = process.env.CODES_PAGE_SECRET || "";
 const ROOT = __dirname;
+const SITE_URL = (process.env.SITE_URL || "https://shadow-learning-production.up.railway.app").replace(/\/+$/, "");
 const BINDINGS_FILE = path.join(ROOT, "bindings.json");
 const GIVE_CODES_ASSIGNMENTS_FILE = path.join(ROOT, "give-codes-assignments.json");
-const GIVE_CODES_LIST = ["624", "819", "518", "123"];
+// 518 = code to open give-codes page. Codes we hand out for the main site: 624, 819, 123.
+const GATE_CODE_HASH = "14ik";  // hashKey("518")
+const CODES_TO_GIVE = ["624", "819", "123"];
+const CODE_TO_HASH = { "624": "15a0", "819": "16qo", "518": "14ik", "123": "11ki" };
 
 const VALID_KEY_HASHES = ["15a0", "16qo", "14ik", "11ki"];
 
@@ -52,10 +55,10 @@ function getOrAssignCode(visitorId) {
     return { code: assignments[visitorId], isReturning: true };
   }
   const counts = {};
-  GIVE_CODES_LIST.forEach((c) => { counts[c] = 0; });
+  CODES_TO_GIVE.forEach((c) => { counts[c] = 0; });
   Object.values(assignments).forEach((c) => { if (counts[c] !== undefined) counts[c]++; });
-  let chosen = GIVE_CODES_LIST[0];
-  GIVE_CODES_LIST.forEach((c) => {
+  let chosen = CODES_TO_GIVE[0];
+  CODES_TO_GIVE.forEach((c) => {
     if (counts[c] < counts[chosen]) chosen = c;
   });
   const newId = visitorId || crypto.randomBytes(16).toString("hex");
@@ -107,6 +110,72 @@ function serveFile(res, filePath) {
     res.setHeader("Content-Type", mime);
     res.end(data);
   });
+}
+
+// Hash license key (must match script.js hashKey) for give-codes gate
+function normalizeKeyServer(s) {
+  let str = String(s).trim().replace(/\s+/g, "");
+  const fullwidth = "\uFF10\uFF11\uFF12\uFF13\uFF14\uFF15\uFF16\uFF17\uFF18\uFF19";
+  const normal = "0123456789";
+  for (let i = 0; i < fullwidth.length; i++) {
+    str = str.split(fullwidth[i]).join(normal[i]);
+  }
+  return str;
+}
+function hashKeyServer(s) {
+  const str = normalizeKeyServer(s);
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+  }
+  return (h >>> 0).toString(36);
+}
+
+function buildGiveCodesKeyGateForm(errorMsg) {
+  const err = errorMsg ? "<p style=\"color:#f87171;font-size:0.9rem;margin-top:12px\">" + errorMsg + "</p>" : "";
+  return (
+    "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\"/><meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\"/>"
+    + "<title>Enter license key – Shadow Learning</title>"
+    + "<link href=\"https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&display=swap\" rel=\"stylesheet\"/>"
+    + "<style>*{box-sizing:border-box}body{margin:0;min-height:100vh;font-family:\"Outfit\",system-ui,sans-serif;background:#030406;color:#f4f5f9;display:flex;align-items:center;justify-content:center;padding:24px}"
+    + ".card{background:#080b10;border-radius:20px;padding:32px;max-width:380px;width:100%;box-shadow:0 0 0 1px rgba(148,163,184,0.08)}"
+    + "h1{font-size:1.25rem;margin:0 0 8px 0;background:linear-gradient(135deg,#22d3ee,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}"
+    + ".desc{font-size:0.9rem;color:#8b95a8;margin-bottom:20px}"
+    + "input{width:100%;padding:12px 16px;font-size:1rem;border-radius:10px;border:1px solid rgba(148,163,184,0.2);background:rgba(15,23,42,0.6);color:#f4f5f9;font-family:inherit}"
+    + "button{width:100%;margin-top:12px;padding:12px;font-size:1rem;font-weight:600;border:none;border-radius:10px;background:rgba(34,211,238,0.25);color:#22d3ee;cursor:pointer;font-family:inherit}"
+    + "button:hover{background:rgba(34,211,238,0.4)}</style></head><body><div class=\"card\">"
+    + "<h1>Enter license key</h1><p class=\"desc\">Enter your license key to view your key and unlock the site.</p>"
+    + "<form method=\"post\" action=\"\">"
+    + "<input type=\"text\" name=\"key\" placeholder=\"License key\" autocomplete=\"off\" required/>"
+    + "<button type=\"submit\">Continue</button></form>" + err + "</div></body></html>"
+  );
+}
+
+function buildGiveCodesPage(code, message, siteUrl, warning) {
+  const warningBlock = warning
+    ? "<p class=\"warning\" id=\"warning\">" + warning + "</p>"
+    : "<p class=\"warning\" id=\"warning\" style=\"display:none\"></p>";
+  return (
+    "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\"/><meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\"/>"
+    + "<title>Your license key – Shadow Learning</title>"
+    + "<link href=\"https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&display=swap\" rel=\"stylesheet\"/>"
+    + "<style>*{box-sizing:border-box}body{margin:0;min-height:100vh;font-family:\"Outfit\",system-ui,sans-serif;background:#030406;color:#f4f5f9;display:flex;align-items:center;justify-content:center;padding:24px}"
+    + ".card{background:#080b10;border-radius:20px;padding:32px;max-width:420px;width:100%;box-shadow:0 0 0 1px rgba(148,163,184,0.08),0 24px 48px rgba(0,0,0,0.4)}"
+    + ".badge{font-size:0.75rem;font-weight:700;letter-spacing:0.12em;color:rgba(34,211,238,0.9);margin-bottom:8px}"
+    + "h1{font-size:1.5rem;font-weight:700;margin:0 0 8px 0;background:linear-gradient(135deg,#22d3ee,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}"
+    + ".desc{font-size:0.9rem;color:#8b95a8;margin-bottom:24px;line-height:1.5}"
+    + ".code-row{display:flex;align-items:center;gap:12px;padding:14px 16px;background:rgba(15,23,42,0.6);border-radius:12px;margin-bottom:10px;border:1px solid rgba(148,163,184,0.08)}"
+    + ".code-value{flex:1;font-size:1.1rem;font-weight:600;letter-spacing:0.08em}"
+    + ".copy-btn{font-family:inherit;font-size:0.85rem;font-weight:600;padding:8px 14px;border:none;border-radius:10px;background:rgba(34,211,238,0.2);color:#22d3ee;cursor:pointer}"
+    + ".copy-btn:hover{background:rgba(34,211,238,0.35)}.copy-btn.copied{background:rgba(34,197,94,0.25);color:#4ade80}"
+    + ".foot{margin-top:20px;font-size:0.8rem;color:#64748b}.foot a{color:#22d3ee;text-decoration:none}"
+    + "</style></head><body><div class=\"card\"><p class=\"badge\">Customer</p><h1>Your license key</h1><p class=\"desc\">" + message + "</p>"
+    + "<div class=\"code-row\"><span class=\"code-value\" data-code=\"" + code + "\">" + code + "</span>"
+    + "<button type=\"button\" class=\"copy-btn\" data-code=\"" + code + "\">Copy</button></div>"
+    + warningBlock
+    + "<p class=\"foot\">Use this license key at <a href=\"" + siteUrl + "\" target=\"_blank\" rel=\"noopener noreferrer\">the site</a> to unlock. Each key can only be used once.</p></div>"
+    + "<script>document.querySelectorAll(\".copy-btn\").forEach(function(btn){btn.addEventListener(\"click\",function(){var c=this.getAttribute(\"data-code\");navigator.clipboard.writeText(c).then(function(){btn.textContent=\"Copied\";btn.classList.add(\"copied\");setTimeout(function(){btn.textContent=\"Copy\"},1500)})})});</script></body></html>"
+  );
 }
 
 function resolveUrl(base, rel) {
@@ -249,45 +318,62 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Give-codes page: only if ?access=CODES_PAGE_SECRET (for Discord bot link)
-  if (url === "/give-codes") {
-    const access = (query.access && String(query.access).trim()) || "";
-    if (!CODES_PAGE_SECRET || access !== CODES_PAGE_SECRET) {
-      res.writeHead(403, { "Content-Type": "text/html; charset=utf-8" });
-      res.end(
-        "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"/><title>Access denied</title></head><body style=\"font-family:system-ui;background:#030406;color:#f4f5f9;min-height:100vh;display:flex;align-items:center;justify-content:center;margin:0\"><p>Access denied.</p></body></html>"
-      );
+  // Give-codes: GET serves the form (give-codes.html). POST: only code 518 opens; then we assign an unused code (624/819/123) for the main site.
+  const pathNorm = (url || "/").replace(/\/+$/, "") || "/";
+  if (pathNorm === "/give-codes") {
+    if (req.method === "GET") {
+      const formPath = path.join(ROOT, "give-codes.html");
+      fs.readFile(formPath, "utf8", (err, data) => {
+        if (err) {
+          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+          res.end(buildGiveCodesKeyGateForm(null));
+          return;
+        }
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        res.end(data);
+      });
       return;
     }
-    const cookieHeader = req.headers["cookie"] || "";
-    const cookies = parseCookie(cookieHeader);
-    const visitorId = (cookies.gc_visitor && String(cookies.gc_visitor).trim()) || null;
-    const result = getOrAssignCode(visitorId);
-    const codesPath = path.join(ROOT, "give-codes.html");
-    fs.readFile(codesPath, "utf8", (err, data) => {
-      if (err) {
-        res.writeHead(404, { "Content-Type": "text/plain" });
-        res.end("Not found");
-        return;
-      }
-      const code = result.code;
-      const message = result.isReturning
-        ? "Welcome back — here’s the same code as last time."
-        : "Your access code is below. We’ll remember you next time.";
-      let html = data
-        .replace(/\{\{CODE\}\}/g, code)
-        .replace(/\{\{MESSAGE\}\}/g, message);
-      const headers = { "Content-Type": "text/html; charset=utf-8" };
-      if (result.visitorId) {
-        headers["Set-Cookie"] = "gc_visitor=" + result.visitorId + "; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax";
-      }
-      res.writeHead(200, headers);
-      res.end(html);
-    });
+    if (req.method === "POST") {
+      let postBody = "";
+      req.on("data", (chunk) => { postBody += chunk; });
+      req.on("end", () => {
+        let key = "";
+        if (req.headers["content-type"] && req.headers["content-type"].toLowerCase().includes("application/x-www-form-urlencoded")) {
+          const match = postBody.match(/(?:^|&)key=([^&]*)/);
+          if (match) key = decodeURIComponent(match[1].replace(/\+/g, " ")).trim();
+        }
+        if (!key) {
+          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+          res.end(buildGiveCodesKeyGateForm("Please enter your license code."));
+          return;
+        }
+        const keyHash = hashKeyServer(key);
+        if (keyHash !== GATE_CODE_HASH) {
+          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+          res.end(buildGiveCodesKeyGateForm("Invalid code. Use 518 to continue."));
+          return;
+        }
+        const consumed = loadConsumedKeys();
+        const unused = CODES_TO_GIVE.filter((c) => consumed.indexOf(CODE_TO_HASH[c]) === -1);
+        if (unused.length === 0) {
+          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+          res.end(buildGiveCodesKeyGateForm("All codes are in use. Contact support."));
+          return;
+        }
+        const assignedCode = unused[0];
+        const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        const message = "Your access code for the website is below. Use it on the site to unlock. Each code works only once.";
+        const html = buildGiveCodesPage(esc(assignedCode), message, SITE_URL, "");
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        res.end(html);
+      });
+      return;
+    }
+    res.writeHead(405, { "Content-Type": "text/plain" });
+    res.end("Method not allowed");
     return;
   }
-
-  // Browse proxy: GET or POST /browse?u= or ?url= — fetches URL, follows redirects, rewrites HTML
   if (url === "/browse") {
     res.setHeader("Access-Control-Allow-Origin", "*");
     if (req.method === "OPTIONS") {
@@ -403,13 +489,28 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Static files (give-codes.html is only served via /give-codes?access=...)
-  let filePath = path.join(ROOT, url === "/" ? "index.html" : url);
-  if (url === "/give-codes.html" || path.basename(filePath) === "give-codes.html") {
-    res.writeHead(404, { "Content-Type": "text/plain" });
-    res.end("Not found");
+  // templates/give-codes.html: serve with demo values so you can open and run it in the browser
+  if (url === "/templates/give-codes.html") {
+    const templatePath = path.join(ROOT, "templates", "give-codes.html");
+    fs.readFile(templatePath, "utf8", (err, data) => {
+      if (err) {
+        res.writeHead(404, { "Content-Type": "text/plain" });
+        res.end("Not found");
+        return;
+      }
+      const html = data
+        .replace(/\{\{CODE\}\}/g, "624")
+        .replace(/\{\{MESSAGE\}\}/g, "Your access code for the website is below. Use it on the site to unlock. Each code works only once.")
+        .replace(/\{\{SITE_URL\}\}/g, SITE_URL)
+        .replace(/\{\{WARNING\}\}/g, "");
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.end(html);
+    });
     return;
   }
+
+  // Static files (including other files in templates/ if you add any)
+  let filePath = path.join(ROOT, url === "/" ? "index.html" : url);
   if (!path.resolve(filePath).startsWith(path.resolve(ROOT))) {
     res.writeHead(403);
     res.end("Forbidden");

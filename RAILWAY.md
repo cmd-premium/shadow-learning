@@ -31,13 +31,12 @@ Add:
 | Variable | Value |
 |----------|--------|
 | `LOG_TO_SHEET_APP_URL` | Your Google Apps Script Web App URL (for key logging) |
-| `CODES_PAGE_SECRET` | A secret string (e.g. `openssl rand -hex 24`). Used in the give-codes page URL so only your Discord bot link grants access. |
 
 (Use your real Apps Script Web App URL if different.)
 
-**Give codes page (for Discord bot):** The page that lists access codes is at  
-`https://your-app.up.railway.app/give-codes?access=YOUR_CODES_PAGE_SECRET`  
-Use this exact URL in your Discord bot command so only people who get the link from the bot can open it. If the `access` param is missing or wrong, they see "Access denied."
+**Give-codes page:** Customers open  
+`https://shadow-learning-production.up.railway.app/give-codes`  
+(or `/give-codes.html`). They enter license code **518** to get a one-time access code (624, 819, or 123) for the main site.
 
 No need to set `PORT`; Railway sets it for you.
 
