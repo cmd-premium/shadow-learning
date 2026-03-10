@@ -338,35 +338,53 @@ const server = http.createServer((req, res) => {
       let postBody = "";
       req.on("data", (chunk) => { postBody += chunk; });
       req.on("end", () => {
+        const ct = (req.headers["content-type"] || "").toLowerCase();
+        const isForm = ct.includes("application/x-www-form-urlencoded") || ct.includes("application/x-www-form-urlencoded;");
         let key = "";
-        if (req.headers["content-type"] && req.headers["content-type"].toLowerCase().includes("application/x-www-form-urlencoded")) {
+        if (postBody && (isForm || postBody.includes("="))) {
           const match = postBody.match(/(?:^|&)key=([^&]*)/);
-          if (match) key = decodeURIComponent(match[1].replace(/\+/g, " ")).trim();
+          if (match) {
+            try {
+              key = decodeURIComponent(String(match[1]).replace(/\+/g, " ")).trim();
+            } catch (e) {}
+          }
         }
-        if (!key) {
+        try {
+          if (!key) {
+            res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+            res.end(buildGiveCodesKeyGateForm("Please enter your license code."));
+            return;
+          }
+          const keyHash = hashKeyServer(key);
+          if (keyHash !== GATE_CODE_HASH) {
+            res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+            res.end(buildGiveCodesKeyGateForm("Invalid code. Use 518 to continue."));
+            return;
+          }
+          const consumed = loadConsumedKeys();
+          const consumedSet = Array.isArray(consumed) ? consumed : [];
+          const unused = CODES_TO_GIVE.filter((c) => CODE_TO_HASH[c] && consumedSet.indexOf(CODE_TO_HASH[c]) === -1);
+          if (unused.length === 0) {
+            res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+            res.end(buildGiveCodesKeyGateForm("All codes are in use. Contact support."));
+            return;
+          }
+          const assignedCode = unused[0];
+          const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+          const message = "Your access code for the website is below. Use it on the site to unlock. Each code works only once.";
+          const siteUrl = typeof SITE_URL === "string" ? SITE_URL : "https://shadow-learning-production.up.railway.app";
+          const html = buildGiveCodesPage(esc(assignedCode), message, siteUrl, "");
           res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-          res.end(buildGiveCodesKeyGateForm("Please enter your license code."));
-          return;
+          res.end(html);
+        } catch (err) {
+          console.error("give-codes POST error:", err);
+          res.writeHead(500, { "Content-Type": "text/html; charset=utf-8" });
+          res.end(buildGiveCodesKeyGateForm("Something went wrong. Please try again."));
         }
-        const keyHash = hashKeyServer(key);
-        if (keyHash !== GATE_CODE_HASH) {
-          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-          res.end(buildGiveCodesKeyGateForm("Invalid code. Use 518 to continue."));
-          return;
-        }
-        const consumed = loadConsumedKeys();
-        const unused = CODES_TO_GIVE.filter((c) => consumed.indexOf(CODE_TO_HASH[c]) === -1);
-        if (unused.length === 0) {
-          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-          res.end(buildGiveCodesKeyGateForm("All codes are in use. Contact support."));
-          return;
-        }
-        const assignedCode = unused[0];
-        const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-        const message = "Your access code for the website is below. Use it on the site to unlock. Each code works only once.";
-        const html = buildGiveCodesPage(esc(assignedCode), message, SITE_URL, "");
-        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-        res.end(html);
+      });
+      req.on("error", () => {
+        res.writeHead(500, { "Content-Type": "text/html; charset=utf-8" });
+        res.end(buildGiveCodesKeyGateForm("Request error. Please try again."));
       });
       return;
     }
