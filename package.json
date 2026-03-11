@@ -8,6 +8,7 @@
     "push": "node scripts/push-to-github.js"
   },
   "dependencies": {
+    "http-proxy-agent": "^7.0.2",
     "https-proxy-agent": "^7.0.2"
   }
 }

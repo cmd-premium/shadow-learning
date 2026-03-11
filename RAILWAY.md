@@ -38,11 +38,9 @@ Add:
 `https://shadow-learning-production.up.railway.app/give-codes`  
 (or `/give-codes.html`). They enter license code **518** to get a one-time access code (624, 819, or 123) for the main site.
 
-**Browser:** Open `/browser` (or `/browser.html`) for a tabbed browser that loads DuckDuckGo by default; all pages are fetched via the `/browse` proxy. Use **PROXY_URL** to route that traffic through an HTTP(S) proxy.
-
-No need to set `PORT`; Railway sets it for you.
-
-**Optional:** To send all outbound `/browse` traffic through an HTTP(S) proxy, set `PROXY_URL` (or `HTTP_PROXY` / `HTTPS_PROXY`) to your proxy URL, e.g. `http://proxy.example.com:8080`. Requires the `https-proxy-agent` dependency (included in `package.json`).
+**Browser:** Open `/browser` (or `/browser.html`) for a tabbed browser (DuckDuckGo by default). All site traffic goes through the `/browse` proxy. **To access websites you need a proxy:** set **PROXY_URL** (or **HTTP_PROXY** / **HTTPS_PROXY**) to your proxy URL (e.g. `http://proxy.example.com:8080`). Without it, outbound requests from Railway may be blocked or fail. Run `npm install` so `http-proxy-agent` and `https-proxy-agent` are installed.
+</think><｜tool▁call▁begin｜>
+TodoWrite
 
 ## 4. Get your public URL
 

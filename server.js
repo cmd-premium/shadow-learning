@@ -11,13 +11,16 @@ const path = require("path");
 const urlModule = require("url");
 const crypto = require("crypto");
 const PROXY_URL = process.env.PROXY_URL || process.env.HTTP_PROXY || process.env.HTTPS_PROXY || "";
-let proxyAgent = null;
+let httpsProxyAgent = null;
+let httpProxyAgent = null;
 if (PROXY_URL) {
   try {
     const { HttpsProxyAgent } = require("https-proxy-agent");
-    proxyAgent = new HttpsProxyAgent(PROXY_URL);
+    const { HttpProxyAgent } = require("http-proxy-agent");
+    httpsProxyAgent = new HttpsProxyAgent(PROXY_URL);
+    httpProxyAgent = new HttpProxyAgent(PROXY_URL);
   } catch (e) {
-    console.warn("PROXY_URL set but https-proxy-agent not installed. Run: npm install");
+    console.warn("Proxy set but proxy agents not installed. Run: npm install");
   }
 }
 
@@ -490,6 +493,7 @@ const server = http.createServer((req, res) => {
       }
       const nextUrl = new URL(followUrl);
       const nextLib = followUrl.startsWith("https") ? https : http;
+      const useProxy = followUrl.startsWith("https") ? httpsProxyAgent : httpProxyAgent;
       const opts = {
         method: redirectCount === 0 ? method : "GET",
         headers: {
@@ -497,21 +501,15 @@ const server = http.createServer((req, res) => {
           "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
           "Accept-Language": "en-US,en;q=0.9"
         },
-        timeout: 20000
+        timeout: 25000
       };
-      if (proxyAgent) opts.agent = proxyAgent;
+      if (useProxy) opts.agent = useProxy;
       if (redirectCount === 0 && method === "POST" && bodyBytes && bodyBytes.length) {
         const ct = req.headers["content-type"] || "application/x-www-form-urlencoded";
         opts.headers["Content-Type"] = ct;
         opts.headers["Content-Length"] = bodyBytes.length;
       }
-      const reqOpts = {
-        hostname: nextUrl.hostname,
-        port: nextUrl.port || (nextUrl.protocol === "https:" ? 443 : 80),
-        path: nextUrl.pathname + nextUrl.search,
-        ...opts
-      };
-      const proxyReq = nextLib.request(reqOpts, (proxyRes) => {
+      const handleResponse = (proxyRes) => {
         if (REDIRECT_CODES.indexOf(proxyRes.statusCode) !== -1) {
           const loc = proxyRes.headers["location"];
           if (loc) {
@@ -538,10 +536,20 @@ const server = http.createServer((req, res) => {
             res.end(body);
           }
         });
-      });
+      };
+      const reqOpts = {
+        hostname: nextUrl.hostname,
+        port: nextUrl.port || (nextUrl.protocol === "https:" ? 443 : 80),
+        path: nextUrl.pathname + nextUrl.search,
+        ...opts
+      };
+      const proxyReq = useProxy
+        ? nextLib.request(followUrl, opts, handleResponse)
+        : nextLib.request(reqOpts, handleResponse);
       proxyReq.on("error", (e) => {
         res.writeHead(502, { "Content-Type": "text/plain" });
-        res.end("Could not load: " + (e.message || "error"));
+        const hint = !PROXY_URL ? " Set PROXY_URL (or HTTP_PROXY) in your environment to route requests through a proxy." : "";
+        res.end("Could not load: " + (e.message || "error") + hint);
       });
       if (redirectCount === 0 && method === "POST" && bodyBytes && bodyBytes.length) {
         proxyReq.write(bodyBytes);
@@ -630,6 +638,6 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => {
   console.log("Server: http://localhost:" + PORT);
   console.log("  Site + /check-key (one key per device) + /browse (proxy) + /browser (tabs)");
-  if (proxyAgent) console.log("  Outbound proxy: " + PROXY_URL);
+  if (PROXY_URL && (httpsProxyAgent || httpProxyAgent)) console.log("  Outbound proxy: " + PROXY_URL);
   if (LOG_TO_SHEET_APP_URL) console.log("  /log-key → Google Sheet");
 });
