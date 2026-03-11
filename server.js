@@ -16,13 +16,29 @@ const LOG_TO_SHEET_APP_URL = process.env.LOG_TO_SHEET_APP_URL || "";
 const ROOT = __dirname;
 const SITE_URL = (process.env.SITE_URL || "https://shadow-learning-production.up.railway.app").replace(/\/+$/, "");
 const BINDINGS_FILE = path.join(ROOT, "bindings.json");
+const CONSUMED_KEYS_FILE = path.join(ROOT, "consumed-keys.json");
 const GIVE_CODES_ASSIGNMENTS_FILE = path.join(ROOT, "give-codes-assignments.json");
+const HWID_LOG_FILE = path.join(ROOT, "hwid-log.jsonl");
 // 518 = code to open give-codes page. Codes we hand out for the main site: 624, 819, 123.
 const GATE_CODE_HASH = "14ik";  // hashKey("518")
 const CODES_TO_GIVE = ["624", "819", "123"];
 const CODE_TO_HASH = { "624": "15a0", "819": "16qo", "518": "14ik", "123": "11ki" };
+const HASH_TO_CODE = { "15a0": "624", "16qo": "819", "14ik": "518", "11ki": "123" };
 
 const VALID_KEY_HASHES = ["15a0", "16qo", "14ik", "11ki"];
+
+function appendHwidLog(keyHash, fingerprint) {
+  const code = HASH_TO_CODE[keyHash] || keyHash;
+  const line = JSON.stringify({
+    ts: new Date().toISOString(),
+    code,
+    keyHash,
+    hwid: fingerprint
+  }) + "\n";
+  fs.appendFile(HWID_LOG_FILE, line, (err) => {
+    if (err) console.error("HWID log append error:", err.message);
+  });
+}
 
 function loadGiveCodesAssignments() {
   try {
@@ -89,6 +105,19 @@ function loadBindings() {
 
 function saveBindings(obj) {
   fs.writeFileSync(BINDINGS_FILE, JSON.stringify(obj, null, 2), "utf8");
+}
+
+function loadConsumedKeys() {
+  try {
+    const data = JSON.parse(fs.readFileSync(CONSUMED_KEYS_FILE, "utf8"));
+    return Array.isArray(data) ? data : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveConsumedKeys(arr) {
+  fs.writeFileSync(CONSUMED_KEYS_FILE, JSON.stringify(Array.isArray(arr) ? arr : [], null, 2), "utf8");
 }
 
 // Reset all key→device bindings so every code can be used on a new device.
@@ -269,6 +298,7 @@ const server = http.createServer((req, res) => {
 
       bindings[keyHash] = fingerprint;
       saveBindings(bindings);
+      appendHwidLog(keyHash, fingerprint);
 
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ ok: true }));
@@ -370,6 +400,11 @@ const server = http.createServer((req, res) => {
             return;
           }
           const assignedCode = unused[0];
+          const assignedHash = CODE_TO_HASH[assignedCode];
+          if (assignedHash) {
+            const newConsumed = consumedSet.indexOf(assignedHash) === -1 ? [...consumedSet, assignedHash] : consumedSet;
+            saveConsumedKeys(newConsumed);
+          }
           const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
           const message = "Your access code for the website is below. Use it on the site to unlock. Each code works only once.";
           const siteUrl = typeof SITE_URL === "string" ? SITE_URL : "https://shadow-learning-production.up.railway.app";
