@@ -454,6 +454,16 @@ const server = http.createServer((req, res) => {
       return null;
     };
     target = tryParam("u") || tryParam("url") || tryParam("URL") || (query && (query.u || query.url || query.URL));
+    let gotTargetFromReferer = false;
+    if (!target && req.headers["referer"]) {
+      try {
+        const ref = new URL(req.headers["referer"]);
+        if (ref.pathname === "/browse" && ref.searchParams.get("u")) {
+          target = ref.searchParams.get("u");
+          gotTargetFromReferer = true;
+        }
+      } catch (e) {}
+    }
     if (typeof target === "string") target = target.trim();
     if (!target || !/^https?:\/\//i.test(target)) {
       res.writeHead(400, { "Content-Type": "text/plain" });
@@ -465,7 +475,7 @@ const server = http.createServer((req, res) => {
       if (key !== "u" && key !== "url" && key !== "URL") targetUrl.searchParams.set(key, query[key]);
     });
     target = targetUrl.href;
-    const method = req.method === "POST" ? "POST" : "GET";
+    let method = req.method === "POST" ? "POST" : "GET";
     const lib = target.startsWith("https") ? https : http;
     const REDIRECT_CODES = [301, 302, 303, 307, 308];
     const MAX_REDIRECTS = 5;
@@ -542,7 +552,28 @@ const server = http.createServer((req, res) => {
     if (method === "POST") {
       let body = [];
       req.on("data", (chunk) => body.push(chunk));
-      req.on("end", () => doRequest(Buffer.concat(body)));
+      req.on("end", () => {
+        const bodyBytes = Buffer.concat(body);
+        if (gotTargetFromReferer && bodyBytes.length) {
+          const bodyStr = bodyBytes.toString("utf8");
+          const mergeUrl = new URL(target);
+          bodyStr.split("&").forEach((part) => {
+            const i = part.indexOf("=");
+            if (i !== -1) {
+              try {
+                const key = decodeURIComponent(part.slice(0, i).replace(/\+/g, " "));
+                const val = decodeURIComponent(part.slice(i + 1).replace(/\+/g, " "));
+                mergeUrl.searchParams.set(key, val);
+              } catch (e) {}
+            }
+          });
+          target = mergeUrl.href;
+          method = "GET";
+          doRequest(null);
+        } else {
+          doRequest(bodyBytes);
+        }
+      });
     } else {
       doRequest(null);
     }
