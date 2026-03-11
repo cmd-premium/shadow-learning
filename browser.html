@@ -152,7 +152,7 @@
 <body>
   <div class="browser-bar">
     <div class="addr-wrap">
-      <input type="text" id="addr" placeholder="Search DuckDuckGo or enter URL" spellcheck="false" />
+      <input type="text" id="addr" placeholder="Search or enter any URL (proxied)" spellcheck="false" />
       <button type="button" class="go-btn" id="go">Go</button>
     </div>
   </div>
@@ -220,6 +220,17 @@
         return div.innerHTML;
       }
 
+      function getUrlFromBrowseSrc(src) {
+        if (!src || src.indexOf("/browse") === -1) return null;
+        try {
+          const u = new URL(src, location.origin);
+          const param = u.searchParams.get("u") || u.searchParams.get("url") || u.searchParams.get("URL");
+          return param ? decodeURIComponent(param) : null;
+        } catch (e) {
+          return null;
+        }
+      }
+
       function renderFrames() {
         frameWrap.innerHTML = "";
         tabs.forEach(function (t) {
@@ -229,6 +240,24 @@
           iframe.className = t.id === activeId ? "" : "hidden";
           const browseUrl = encodeBrowseUrl(t.url);
           iframe.src = browseUrl || encodeBrowseUrl(DEFAULT_URL);
+          iframe.addEventListener("load", function () {
+            var tabId = parseInt(iframe.id.replace("frame-", ""), 10);
+            var loc = (iframe.contentWindow && iframe.contentWindow.location && iframe.contentWindow.location.href) ? iframe.contentWindow.location.href : iframe.src;
+            var resolved = getUrlFromBrowseSrc(loc);
+            if (resolved) {
+              var tab = tabs.find(function (x) { return x.id === tabId; });
+              if (tab) {
+                tab.url = resolved;
+                try {
+                  tab.title = new URL(resolved).hostname || "Page";
+                } catch (e) {
+                  tab.title = "Page";
+                }
+                if (tabId === activeId) addrInput.value = resolved;
+                renderTabs();
+              }
+            }
+          });
           frameWrap.appendChild(iframe);
         });
       }
