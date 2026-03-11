@@ -10,6 +10,16 @@ const fs = require("fs");
 const path = require("path");
 const urlModule = require("url");
 const crypto = require("crypto");
+const PROXY_URL = process.env.PROXY_URL || process.env.HTTP_PROXY || process.env.HTTPS_PROXY || "";
+let proxyAgent = null;
+if (PROXY_URL) {
+  try {
+    const { HttpsProxyAgent } = require("https-proxy-agent");
+    proxyAgent = new HttpsProxyAgent(PROXY_URL);
+  } catch (e) {
+    console.warn("PROXY_URL set but https-proxy-agent not installed. Run: npm install");
+  }
+}
 
 const PORT = process.env.PORT || 3000;
 const LOG_TO_SHEET_APP_URL = process.env.LOG_TO_SHEET_APP_URL || "";
@@ -479,6 +489,7 @@ const server = http.createServer((req, res) => {
         },
         timeout: 15000
       };
+      if (proxyAgent) opts.agent = proxyAgent;
       if (redirectCount === 0 && method === "POST" && bodyBytes && bodyBytes.length) {
         const ct = req.headers["content-type"] || "application/x-www-form-urlencoded";
         opts.headers["Content-Type"] = ct;
@@ -558,6 +569,12 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Browser (DuckDuckGo + proxy + tabs)
+  if (url === "/browser" || url === "/browser/") {
+    serveFile(res, path.join(ROOT, "browser.html"));
+    return;
+  }
+
   // Static files (including other files in templates/ if you add any)
   let filePath = path.join(ROOT, url === "/" ? "index.html" : url);
   if (!path.resolve(filePath).startsWith(path.resolve(ROOT))) {
@@ -568,6 +585,7 @@ const server = http.createServer((req, res) => {
   fs.stat(filePath, (err, stat) => {
     if (err || !stat.isFile()) {
       if (url === "/learn" || url === "/learn/") filePath = path.join(ROOT, "learn.html");
+      else if (url === "/browser.html") filePath = path.join(ROOT, "browser.html");
       else {
         res.writeHead(404, { "Content-Type": "text/plain" });
         res.end("Not found");
@@ -580,6 +598,7 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
   console.log("Server: http://localhost:" + PORT);
-  console.log("  Site + /check-key (one key per device) + /browse (proxy)");
+  console.log("  Site + /check-key (one key per device) + /browse (proxy) + /browser (tabs)");
+  if (proxyAgent) console.log("  Outbound proxy: " + PROXY_URL);
   if (LOG_TO_SHEET_APP_URL) console.log("  /log-key → Google Sheet");
 });
