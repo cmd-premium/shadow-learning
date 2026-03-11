@@ -152,7 +152,7 @@
 <body>
   <div class="browser-bar">
     <div class="addr-wrap">
-      <input type="text" id="addr" placeholder="Search or enter URL (runs via proxy)" spellcheck="false" />
+      <input type="text" id="addr" placeholder="Search DuckDuckGo or enter URL" spellcheck="false" />
       <button type="button" class="go-btn" id="go">Go</button>
     </div>
   </div>
@@ -277,8 +277,14 @@
         const url = addrInput.value.trim();
         const tab = tabs.find(function (t) { return t.id === activeId; });
         if (!tab) return;
-        const toOpen = !url ? DEFAULT_URL : (/^https?:\/\//i.test(url) ? url : "https://duckduckgo.com/?q=" + encodeURIComponent(url));
+        // If it's not a full URL, go to DuckDuckGo with the typed text as the search query
+        const toOpen = !url
+          ? DEFAULT_URL
+          : /^https?:\/\//i.test(url)
+            ? url
+            : "https://duckduckgo.com/?q=" + encodeURIComponent(url);
         tab.url = toOpen;
+        addrInput.value = toOpen;
         try {
           tab.title = new URL(toOpen).hostname || "New tab";
         } catch (e) {
