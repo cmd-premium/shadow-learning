@@ -401,10 +401,11 @@ const server = http.createServer((req, res) => {
           const message = "Your access code for the website is below. This is your code for this device only.";
           const siteUrl = typeof SITE_URL === "string" ? SITE_URL : "https://shadow-learning-production.up.railway.app";
           const html = buildGiveCodesPage(esc(assignedCode), message, siteUrl, "");
-          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+          const headers = { "Content-Type": "text/html; charset=utf-8" };
           if (result.visitorId) {
-            res.setHeader("Set-Cookie", "give_codes_visitor=" + result.visitorId + "; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax");
+            headers["Set-Cookie"] = "give_codes_visitor=" + result.visitorId + "; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax";
           }
+          res.writeHead(200, headers);
           res.end(html);
         } catch (err) {
           console.error("give-codes POST error:", err);
