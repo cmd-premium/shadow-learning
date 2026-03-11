@@ -198,11 +198,13 @@ function buildGiveCodesPage(code, message, siteUrl, warning) {
     + ".copy-btn{font-family:inherit;font-size:0.85rem;font-weight:600;padding:8px 14px;border:none;border-radius:10px;background:rgba(34,211,238,0.2);color:#22d3ee;cursor:pointer}"
     + ".copy-btn:hover{background:rgba(34,211,238,0.35)}.copy-btn.copied{background:rgba(34,197,94,0.25);color:#4ade80}"
     + ".foot{margin-top:20px;font-size:0.8rem;color:#64748b}.foot a{color:#22d3ee;text-decoration:none}"
+    + ".cta-btn{display:inline-block;margin-top:8px;padding:12px 20px;border-radius:12px;background:rgba(167,139,250,0.25);color:#a78bfa;font-weight:600;text-decoration:none;transition:background 0.2s}.cta-btn:hover{background:rgba(167,139,250,0.4)}"
     + "</style></head><body><div class=\"card\"><p class=\"badge\">Customer</p><h1>Your license key</h1><p class=\"desc\">" + message + "</p>"
     + "<div class=\"code-row\"><span class=\"code-value\" data-code=\"" + code + "\">" + code + "</span>"
     + "<button type=\"button\" class=\"copy-btn\" data-code=\"" + code + "\">Copy</button></div>"
     + warningBlock
-    + "<p class=\"foot\">Use this license key at <a href=\"" + siteUrl + "\" target=\"_blank\" rel=\"noopener noreferrer\">the site</a> to unlock. Each key can only be used once.</p></div>"
+    + "<p class=\"foot\">Use this license key at <a href=\"" + siteUrl + "\" target=\"_blank\" rel=\"noopener noreferrer\">the site</a> to unlock. This code is for this device only.</p>"
+    + "<p style=\"margin-top:16px\"><a href=\"https://bit.ly/shadowlearning\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"cta-btn\">Go to Shadow Learning</a></p></div>"
     + "<script>document.querySelectorAll(\".copy-btn\").forEach(function(btn){btn.addEventListener(\"click\",function(){var c=this.getAttribute(\"data-code\");navigator.clipboard.writeText(c).then(function(){btn.textContent=\"Copied\";btn.classList.add(\"copied\");setTimeout(function(){btn.textContent=\"Copy\"},1500)})})});</script></body></html>"
   );
 }
@@ -391,25 +393,18 @@ const server = http.createServer((req, res) => {
             res.end(buildGiveCodesKeyGateForm("Invalid code. Use 518 to continue."));
             return;
           }
-          const consumed = loadConsumedKeys();
-          const consumedSet = Array.isArray(consumed) ? consumed : [];
-          const unused = CODES_TO_GIVE.filter((c) => CODE_TO_HASH[c] && consumedSet.indexOf(CODE_TO_HASH[c]) === -1);
-          if (unused.length === 0) {
-            res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-            res.end(buildGiveCodesKeyGateForm("All codes are in use. Contact support."));
-            return;
-          }
-          const assignedCode = unused[0];
-          const assignedHash = CODE_TO_HASH[assignedCode];
-          if (assignedHash) {
-            const newConsumed = consumedSet.indexOf(assignedHash) === -1 ? [...consumedSet, assignedHash] : consumedSet;
-            saveConsumedKeys(newConsumed);
-          }
+          const cookie = parseCookie(req.headers["cookie"]);
+          const visitorId = (cookie && cookie.give_codes_visitor) ? cookie.give_codes_visitor : null;
+          const result = getOrAssignCode(visitorId);
+          const assignedCode = result.code;
           const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-          const message = "Your access code for the website is below. Use it on the site to unlock. Each code works only once.";
+          const message = "Your access code for the website is below. This is your code for this device only.";
           const siteUrl = typeof SITE_URL === "string" ? SITE_URL : "https://shadow-learning-production.up.railway.app";
           const html = buildGiveCodesPage(esc(assignedCode), message, siteUrl, "");
           res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+          if (result.visitorId) {
+            res.setHeader("Set-Cookie", "give_codes_visitor=" + result.visitorId + "; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax");
+          }
           res.end(html);
         } catch (err) {
           console.error("give-codes POST error:", err);
@@ -553,7 +548,7 @@ const server = http.createServer((req, res) => {
       }
       const html = data
         .replace(/\{\{CODE\}\}/g, "624")
-        .replace(/\{\{MESSAGE\}\}/g, "Your access code for the website is below. Use it on the site to unlock. Each code works only once.")
+        .replace(/\{\{MESSAGE\}\}/g, "Your access code for the website is below. This is your code for this device only.")
         .replace(/\{\{SITE_URL\}\}/g, SITE_URL)
         .replace(/\{\{WARNING\}\}/g, "");
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
