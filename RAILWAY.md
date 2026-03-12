@@ -86,6 +86,22 @@ All keys (624, 819, 518) are then unbound; the next device to use each key will 
 
 ---
 
+## Classic Game Zone (2,266 games in Play section)
+
+The **Play** section loads games from `classicgamezone-games.json`. By default the repo includes a small list (~18 games). To fetch **all 2,266 games** from classicgamezone.com and overwrite the JSON:
+
+1. Install Puppeteer (one-time):  
+   `npm install puppeteer --save-dev`
+2. Run the scraper:  
+   `npm run fetch-classic`  
+   (or `node scripts/fetch-classicgamezone-puppeteer.js`). This visits all 126 listing pages and can take several minutes.
+3. Commit the updated `classicgamezone-games.json` and redeploy. The Play section will then show every game as its own card; clicking opens the game on Classic Game Zone in a new tab.
+
+To test with fewer pages:  
+`CLASSIC_PAGES=3 npm run fetch-classic` (e.g. 3 pages only).
+
+---
+
 **Quick checklist**
 
 - [ ] Repo on GitHub

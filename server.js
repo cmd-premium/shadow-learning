@@ -154,6 +154,128 @@ function serveFile(res, filePath) {
   });
 }
 
+// Classic Game Zone: in-memory cache of all games (built on first request to /api/classic-games)
+let classicGamesCache = null;
+let classicGamesFetching = false;
+
+function fetchClassicGameZonePage(pageNum) {
+  return new Promise((resolve, reject) => {
+    const url = `https://classicgamezone.com/games?page=${pageNum}`;
+    const opts = {
+      hostname: "classicgamezone.com",
+      path: "/games?page=" + pageNum,
+      method: "GET",
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0" },
+    };
+    const req = https.request(opts, (res) => {
+      let data = "";
+      res.on("data", (c) => (data += c));
+      res.on("end", () => resolve(data));
+    });
+    req.on("error", reject);
+    req.setTimeout(15000, () => {
+      req.destroy();
+      reject(new Error("timeout"));
+    });
+    req.end();
+  });
+}
+
+function extractGameLinksFromHtml(html) {
+  const list = [];
+  const seen = new Set();
+
+  // Try __NEXT_DATA__ or similar embedded JSON first
+  const nextDataMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i);
+  if (nextDataMatch) {
+    try {
+      const data = JSON.parse(nextDataMatch[1]);
+      const props = data.props && data.props.pageProps;
+      const games = (props && (props.games || props.initialGames || props.list)) || [];
+      if (Array.isArray(games)) {
+        games.forEach((g) => {
+          const slug = (g && (g.slug || g.slugifiedTitle || g.id)) || "";
+          if (slug && !seen.has(slug)) {
+            seen.add(slug);
+            const title = (g && g.title) || slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+            list.push({ title, slug, url: "https://classicgamezone.com/games/" + slug });
+          }
+        });
+      }
+    } catch (e) {}
+  }
+
+  // href="/games/slug" or href="https://classicgamezone.com/games/slug"
+  const re = /href=["'](?:https?:\/\/[^/]*)?(?:\/en)?\/games\/([a-z0-9][a-z0-9-]*?)["']/gi;
+  let m;
+  while ((m = re.exec(html)) !== null) {
+    const slug = m[1].replace(/\/$/, "").trim();
+    if (slug && slug !== "page" && !seen.has(slug)) {
+      seen.add(slug);
+      const title = slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+      list.push({ title, slug, url: "https://classicgamezone.com/games/" + slug });
+    }
+  }
+
+  // Any /games/slug pattern (broader fallback)
+  const slugRe = /\/games\/([a-z0-9][a-z0-9-]{2,})/gi;
+  while ((m = slugRe.exec(html)) !== null) {
+    const slug = m[1].trim();
+    if (slug && !seen.has(slug)) {
+      seen.add(slug);
+      const title = slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+      list.push({ title, slug, url: "https://classicgamezone.com/games/" + slug });
+    }
+  }
+  return list;
+}
+
+function buildAllClassicGames() {
+  if (classicGamesCache) return Promise.resolve(classicGamesCache);
+  if (classicGamesFetching) {
+    return new Promise((resolve) => {
+      const t = setInterval(() => {
+        if (classicGamesCache) {
+          clearInterval(t);
+          resolve(classicGamesCache);
+        }
+      }, 500);
+    });
+  }
+  classicGamesFetching = true;
+  const TOTAL_PAGES = 126;
+  const all = [];
+  const seenSlugs = new Set();
+
+  const CLASSIC_JSON = path.join(ROOT, "classicgamezone-games.json");
+
+  function next(page) {
+    if (page > TOTAL_PAGES) {
+      classicGamesFetching = false;
+      classicGamesCache = all;
+      if (all.length > 0) {
+        try {
+          fs.writeFileSync(CLASSIC_JSON, JSON.stringify(all), "utf8");
+        } catch (e) {}
+      }
+      return Promise.resolve(all);
+    }
+    return fetchClassicGameZonePage(page)
+      .then((html) => {
+        const games = extractGameLinksFromHtml(html);
+        games.forEach((g) => {
+          if (!seenSlugs.has(g.slug)) {
+            seenSlugs.add(g.slug);
+            all.push(g);
+          }
+        });
+        return new Promise((r) => setTimeout(r, 400)).then(() => next(page + 1));
+      })
+      .catch(() => next(page + 1));
+  }
+  return next(1);
+}
+
 // Hash license key (must match script.js hashKey) for give-codes gate
 function normalizeKeyServer(s) {
   let str = String(s).trim().replace(/\s+/g, "");
@@ -611,6 +733,22 @@ const server = http.createServer((req, res) => {
   // Browser (DuckDuckGo + proxy + tabs)
   if (url === "/browser" || url === "/browser/") {
     serveFile(res, path.join(ROOT, "browser.html"));
+    return;
+  }
+
+  // API: full Classic Game Zone list (2,266 games) — built on first request, then cached
+  if (url === "/api/classic-games") {
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    buildAllClassicGames()
+      .then((list) => {
+        res.writeHead(200);
+        res.end(JSON.stringify(list));
+      })
+      .catch((e) => {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: String(e && e.message) || "Failed" }));
+      });
     return;
   }
 

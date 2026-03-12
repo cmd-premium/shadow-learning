@@ -67,7 +67,8 @@ function setUnlocked(keyHash) {
   } catch (e) {}
 }
 
-// ——— Loading: bar fills, burst, then show key gate or home ———
+// ——— Loading: show briefly, then run onReady (game lists load after so UI stays responsive) ———
+var SHADOW_LOADING_MS = 1800;
 (function loadingSequence() {
   var screen = document.getElementById("loading-screen");
   var bar = document.getElementById("loading-bar");
@@ -84,7 +85,6 @@ function setUnlocked(keyHash) {
     document.body.classList.add("loading-done");
     try {
       sessionStorage.setItem("shadowLearningLoaded", "1");
-      // Require key every time loading screen shows (no persistent unlock)
       localStorage.removeItem("sl_unlocked");
       localStorage.removeItem("sl_fp");
       localStorage.removeItem("sl_key_hash");
@@ -94,6 +94,9 @@ function setUnlocked(keyHash) {
     } else {
       document.body.classList.add("key-gate-visible");
     }
+    setTimeout(function() {
+      if (typeof window._shadowLearningOnReady === "function") window._shadowLearningOnReady();
+    }, 0);
   }
 
   if (alreadyLoaded) {
@@ -104,8 +107,8 @@ function setUnlocked(keyHash) {
   screen.classList.add("loading-running");
   setTimeout(function () {
     if (burst) burst.classList.add("loading-burst-go");
-    setTimeout(afterLoad, 500);
-  }, 4500);
+    setTimeout(afterLoad, 400);
+  }, SHADOW_LOADING_MS);
 })();
 
 // ——— Key gate: submit key to unlock (optional server binds key to one device) ———
@@ -329,7 +332,7 @@ if(alive){obstacles.forEach(function(o){if(rectsCollide(player,o))alive=false;})
 obstacles.forEach(drawAsteroid);drawShip();
 document.getElementById("score").textContent=Math.floor(score);
 if(!alive){ctx.fillStyle="rgba(2,6,15,0.9)";ctx.fillRect(0,0,w,h);ctx.fillStyle="#22d3ee";ctx.font="800 26px Outfit";ctx.textAlign="center";ctx.fillText("SHIP DESTROYED",w/2,h/2-32);ctx.fillStyle="rgba(148,163,184,0.95)";ctx.font="600 15px Outfit";ctx.fillText("Distance: "+Math.floor(score)+" km",w/2,h/2+2);ctx.fillStyle="rgba(139,149,168,0.8)";ctx.font="600 12px Outfit";ctx.fillText("SPACE to launch again",w/2,h/2+32);}}
-loop();
+      loop();
 </script></body></html>`;
     case "clicker":
       return `<!DOCTYPE html>
@@ -479,6 +482,11 @@ function openUgsGame(fileId) {
     });
 }
 
+function openClassicGame(slug) {
+  var url = "https://classicgamezone.com/games/" + encodeURIComponent(slug);
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
 var gamesGrid = document.querySelector(".games-grid");
 if (gamesGrid) {
   gamesGrid.addEventListener("click", function(e) {
@@ -488,8 +496,10 @@ if (gamesGrid) {
     if (!id) return;
     if (id.indexOf("ugs:") === 0) {
       openUgsGame(id.slice(4));
-    } else {
+    } else if (getGameHtml(id)) {
       openGameById(id);
+    } else {
+      openClassicGame(id);
     }
   });
 }
@@ -514,11 +524,80 @@ function addUgsGameButton(fileId) {
 }
 
 var ugsList = typeof window.UGS_FILES !== "undefined" && window.UGS_FILES;
-if (ugsList && Array.isArray(ugsList)) {
-  ugsList.forEach(function(fileId) {
-    if (fileId && typeof fileId === "string") addUgsGameButton(fileId);
+var CHUNK_SIZE = 70;
+
+function addButtonsInChunks(items, createButton, onDone) {
+  var index = 0;
+  function nextChunk() {
+    var end = Math.min(index + CHUNK_SIZE, items.length);
+    for (var i = index; i < end; i++) {
+      var el = createButton(items[i], i);
+      if (el && gamesGrid) gamesGrid.appendChild(el);
+    }
+    index = end;
+    if (index >= items.length) {
+      if (typeof onDone === "function") onDone();
+      return;
+    }
+    requestAnimationFrame(nextChunk);
+  }
+  requestAnimationFrame(nextChunk);
+}
+
+function populateGameLists() {
+  if (!gamesGrid) return;
+
+  // 1. Add UGS buttons in chunks (keeps main thread responsive)
+  var ugs = Array.isArray(ugsList) ? ugsList.filter(function(id) { return id && typeof id === "string"; }) : [];
+  addButtonsInChunks(ugs, function(fileId) {
+    var title = formatUgsTitle(fileId);
+    if (title.length > 32) title = title.slice(0, 29) + "...";
+    var existing = gamesGrid.querySelectorAll(".game-button").length;
+    var num = String(existing + 1).padStart(2, "0");
+    var btn = document.createElement("button");
+    btn.className = "game-button";
+    btn.setAttribute("data-game-id", "ugs:" + fileId);
+    btn.innerHTML = "<span class=\"game-num\">" + num + "</span><span class=\"game-meta\"><span class=\"game-title\">" + title + "</span><span class=\"game-tagline\">Open in new tab.</span></span><span class=\"game-arrow\">→</span>";
+    return btn;
+  }, function() {
+    // 2. After UGS done, fetch and add Classic Game Zone in chunks
+    function escapeHtml(s) {
+      var div = document.createElement("div");
+      div.textContent = s;
+      return div.innerHTML;
+    }
+    var jsonUrl = (document.querySelector("base") && document.querySelector("base").getAttribute("href")) || (location.pathname.replace(/\/[^/]*$/, "/") || "/";
+    jsonUrl = (jsonUrl.lastIndexOf("/") === jsonUrl.length - 1 ? jsonUrl : jsonUrl + "/") + "classicgamezone-games.json";
+    fetch(jsonUrl)
+      .then(function(r) { return r.ok ? r.json() : []; })
+      .catch(function() { return []; })
+      .then(function(fromFile) {
+        var list = Array.isArray(fromFile) ? fromFile : [];
+        if (list.length === 0) {
+          return fetch("/api/classic-games").then(function(r) { return r.ok ? r.json() : []; }).catch(function() { return []; })
+            .then(function(fromApi) { return Array.isArray(fromApi) ? fromApi : []; });
+        }
+        return list;
+      })
+      .then(function(list) {
+        if (!list.length) { filterGamesBySearch(); return; }
+        addButtonsInChunks(list, function(game, i) {
+          var slug = game.slug || "";
+          var title = (game.title || slug).replace(/\s+/g, " ").trim();
+          if (title.length > 50) title = title.slice(0, 47) + "...";
+          var startNum = gamesGrid.querySelectorAll(".game-button").length + 1;
+          var num = String(startNum + i).padStart(2, "0");
+          var btn = document.createElement("button");
+          btn.className = "game-button";
+          btn.setAttribute("data-game-id", slug);
+          btn.innerHTML = "<span class=\"game-num\">" + num + "</span><span class=\"game-meta\"><span class=\"game-title\">" + escapeHtml(title) + "</span><span class=\"game-tagline\">Classic Game Zone · Play in browser</span></span><span class=\"game-arrow\">→</span>";
+          return btn;
+        }, filterGamesBySearch);
+      });
   });
 }
+
+window._shadowLearningOnReady = populateGameLists;
 
 function filterGamesBySearch() {
   var searchEl = document.getElementById("game-search");

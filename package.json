@@ -5,10 +5,14 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "push": "node scripts/push-to-github.js"
+    "push": "node scripts/push-to-github.js",
+    "fetch-classic": "node scripts/fetch-classicgamezone-puppeteer.js"
   },
   "dependencies": {
     "http-proxy-agent": "^7.0.2",
     "https-proxy-agent": "^7.0.2"
+  },
+  "devDependencies": {
+    "puppeteer": "^23.0.0"
   }
 }
