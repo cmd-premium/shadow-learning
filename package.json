@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "install:browser": "cd browser && npm install",
     "push": "node scripts/push-to-github.js",
     "fetch-classic": "node scripts/fetch-classicgamezone-puppeteer.js"
   },

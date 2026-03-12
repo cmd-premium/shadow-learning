@@ -25,8 +25,33 @@ if (PROXY_URL) {
 }
 
 const PORT = process.env.PORT || 3000;
+const BROWSER_APP_PORT = process.env.BROWSER_APP_PORT || 3001;
 const LOG_TO_SHEET_APP_URL = process.env.LOG_TO_SHEET_APP_URL || "";
 const ROOT = __dirname;
+const BROWSER_APP_DIR = path.join(ROOT, "browser");
+// Paths that get proxied to the browser app (from browser folder)
+const BROWSER_PROXY_PREFIXES = [
+  "/browser", "/css/", "/assets/", "/uv/", "/epoxy/", "/libcurl/", "/baremux/",
+  "/v1/", "/privacy", "/books/", "/favicon.ico", "/sw.js", "/ana.js", "/new.html",
+  "/login.html", "/login", "/settings/", "/extensions/", "/pages/", "/home/",
+  "/credits.html", "/subscriptions.html", "/ai.html", "/chat/", "/history.html",
+  "/libs/", "/csrf-token", "/ask"
+];
+function shouldProxyToBrowser(pathname) {
+  if (!pathname) return false;
+  for (let i = 0; i < BROWSER_PROXY_PREFIXES.length; i++) {
+    const p = BROWSER_PROXY_PREFIXES[i];
+    if (p === "/browser" && (pathname === "/browser" || pathname === "/browser/")) return true;
+    if (p !== "/browser" && pathname === p) return true;
+    if (p !== "/browser" && pathname.startsWith(p)) return true;
+  }
+  return false;
+}
+function getBrowserProxyPath(pathname) {
+  if (pathname === "/browser" || pathname === "/browser/") return "/";
+  if (pathname.startsWith("/browser/")) return pathname.slice(8) || "/";
+  return pathname;
+}
 const SITE_URL = (process.env.SITE_URL || "https://shadow-learning-production.up.railway.app").replace(/\/+$/, "");
 const BINDINGS_FILE = path.join(ROOT, "bindings.json");
 const CONSUMED_KEYS_FILE = path.join(ROOT, "consumed-keys.json");
@@ -152,6 +177,43 @@ function serveFile(res, filePath) {
     res.setHeader("Content-Type", mime);
     res.end(data);
   });
+}
+
+function proxyToBrowserApp(req, res, pathname) {
+  const targetPath = getBrowserProxyPath(pathname);
+  const isMainDoc = pathname === "/browser" || pathname === "/browser/";
+  const opts = {
+    hostname: "127.0.0.1",
+    port: BROWSER_APP_PORT,
+    path: targetPath + (req.url && req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : ""),
+    method: req.method,
+    headers: { ...req.headers, host: "127.0.0.1:" + BROWSER_APP_PORT }
+  };
+  const proxyReq = http.request(opts, (proxyRes) => {
+    const ct = (proxyRes.headers["content-type"] || "").toLowerCase();
+    if (isMainDoc && ct.indexOf("text/html") !== -1) {
+      const chunks = [];
+      proxyRes.on("data", (c) => chunks.push(c));
+      proxyRes.on("end", () => {
+        let body = Buffer.concat(chunks).toString("utf8");
+        body = body.replace(/<title>[^<]*<\/title>/i, "<title>Shadow Learning</title>");
+        res.writeHead(proxyRes.statusCode || 200, proxyRes.headers);
+        res.end(body);
+      });
+    } else {
+      res.writeHead(proxyRes.statusCode || 200, proxyRes.headers);
+      proxyRes.pipe(res);
+    }
+  });
+  proxyReq.on("error", (err) => {
+    if (isMainDoc) {
+      serveFile(res, path.join(ROOT, "browser.html"));
+    } else {
+      res.writeHead(502, { "Content-Type": "text/plain" });
+      res.end("Proxy browser unavailable: " + (err.message || "connection refused"));
+    }
+  });
+  req.pipe(proxyReq);
 }
 
 // Classic Game Zone: in-memory cache of all games (built on first request to /api/classic-games)
@@ -730,9 +792,9 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Browser (DuckDuckGo + proxy + tabs)
-  if (url === "/browser" || url === "/browser/") {
-    serveFile(res, path.join(ROOT, "browser.html"));
+  // Proxy browser app (from browser folder) — /browser and all its assets/uv/etc.
+  if (shouldProxyToBrowser(url)) {
+    proxyToBrowserApp(req, res, url);
     return;
   }
 
@@ -773,9 +835,53 @@ const server = http.createServer((req, res) => {
   });
 });
 
+// Forward WebSocket upgrade (e.g. /wisp/) to browser app for UV proxy
+server.on("upgrade", (req, socket, head) => {
+  const pathname = (req.url || "").split("?")[0];
+  if (!pathname.startsWith("/wisp")) {
+    socket.destroy();
+    return;
+  }
+  const net = require("net");
+  const proxySocket = net.connect(BROWSER_APP_PORT, "127.0.0.1", () => {
+    const headers = ["Host: 127.0.0.1:" + BROWSER_APP_PORT];
+    for (let i = 0; i < req.rawHeaders.length; i += 2) {
+      const k = req.rawHeaders[i];
+      if (k.toLowerCase() !== "host") headers.push(k + ": " + (req.rawHeaders[i + 1] || ""));
+    }
+    proxySocket.write(req.method + " " + req.url + " HTTP/1.1\r\n" + headers.join("\r\n") + "\r\n\r\n");
+    proxySocket.write(head);
+  });
+  proxySocket.pipe(socket);
+  socket.pipe(proxySocket);
+  proxySocket.on("error", () => socket.destroy());
+  socket.on("error", () => proxySocket.destroy());
+});
+
+let browserChild = null;
+function startBrowserApp() {
+  try {
+    if (!fs.existsSync(path.join(BROWSER_APP_DIR, "index.js"))) return;
+    const { spawn } = require("child_process");
+    browserChild = spawn("node", ["index.js"], {
+      cwd: BROWSER_APP_DIR,
+      env: { ...process.env, PORT: String(BROWSER_APP_PORT) },
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    browserChild.stdout.on("data", (d) => process.stdout.write(d));
+    browserChild.stderr.on("data", (d) => process.stderr.write(d));
+    browserChild.on("error", () => {});
+    browserChild.on("exit", (code) => { if (code) console.warn("Browser app exited:", code); });
+    console.log("  Proxy browser app: http://127.0.0.1:" + BROWSER_APP_PORT + " (proxied at /browser)");
+  } catch (e) {
+    console.warn("  Browser app not started (install deps in browser/ for full proxy):", e.message || e);
+  }
+}
+
 server.listen(PORT, () => {
   console.log("Server: http://localhost:" + PORT);
-  console.log("  Site + /check-key (one key per device) + /browse (proxy) + /browser (tabs)");
+  console.log("  Site + /check-key (one key per device) + /browse (proxy) + /browser (proxy browser)");
   if (PROXY_URL && (httpsProxyAgent || httpProxyAgent)) console.log("  Outbound proxy: " + PROXY_URL);
   if (LOG_TO_SHEET_APP_URL) console.log("  /log-key → Google Sheet");
+  startBrowserApp();
 });

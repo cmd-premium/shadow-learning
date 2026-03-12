@@ -1354,3 +1354,45 @@ body.loading-done .page {
   color: var(--accent);
   font-weight: 700;
 }
+
+/* ——— Retro page (same look as Play section) ——— */
+body.retro-body .retro-page {
+  visibility: visible;
+}
+.retro-page {
+  min-width: 0;
+  margin: 26px auto;
+  padding: 44px 42px 60px;
+  max-width: 800px;
+  background: var(--bg-glass);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 32px 80px -24px rgba(0, 0, 0, 0.62),
+    0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+.retro-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 24px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+  transition: color 0.2s, opacity 0.2s;
+}
+.retro-back:hover {
+  color: var(--accent-2);
+  opacity: 0.95;
+}
+@media (max-width: 700px) {
+  .retro-page {
+    margin: 16px;
+    padding: 30px 22px 44px;
+    border-radius: 24px;
+  }
+}

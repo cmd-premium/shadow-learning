@@ -3,18 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Browser – Shadow Learning</title>
+  <title>Shadow Learning</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='fg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' stop-color='%2322d3ee'/><stop offset='100%25' stop-color='%23a78bfa'/></linearGradient></defs><rect width='32' height='32' rx='8' fill='%23050810'/><text x='16' y='22' font-size='16' text-anchor='middle' font-weight='bold' font-family='system-ui,sans-serif' fill='url(%23fg)'>S</text></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
   <style>
-    * { box-sizing: border-box; }
-    body {
+    /* Browser page: use site theme variables */
+    body.browser-page {
       margin: 0;
       height: 100vh;
-      font-family: "DM Sans", system-ui, sans-serif;
-      background: #faf9f7;
-      color: #1a1a1a;
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -22,11 +21,24 @@
     .browser-bar {
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 20px 24px;
-      background: #faf9f7;
-      border-bottom: 1px solid #e8e6e3;
+      gap: 14px;
+      padding: 14px 20px;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
       flex-shrink: 0;
+    }
+    .browser-back {
+      flex-shrink: 0;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--accent);
+      text-decoration: none;
+      padding: 8px 0;
+      transition: color 0.2s, opacity 0.2s;
+    }
+    .browser-back:hover {
+      color: var(--accent-2);
+      opacity: 0.9;
     }
     .browser-bar .addr-wrap {
       flex: 1;
@@ -42,47 +54,48 @@
       flex: 1;
       min-width: 0;
       padding: 12px 18px;
-      border: 1px solid #e8e6e3;
-      border-radius: 6px;
-      background: #fff;
-      color: #1a1a1a;
-      font-family: "DM Sans", system-ui, sans-serif;
-      font-size: 0.95rem;
-      font-weight: 400;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: rgba(8, 12, 18, 0.6);
+      color: var(--ink);
+      font-family: var(--font);
+      font-size: 14px;
+      font-weight: 500;
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
     .browser-bar input[type="text"]::placeholder {
-      color: #8a8681;
+      color: var(--muted);
     }
     .browser-bar input[type="text"]:focus {
       outline: none;
-      border-color: #1a1a1a;
-      box-shadow: 0 0 0 1px #1a1a1a;
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.25);
     }
     .browser-bar .go-btn {
       padding: 12px 22px;
-      border: 1px solid #1a1a1a;
-      border-radius: 6px;
-      background: #1a1a1a;
-      color: #faf9f7;
-      font-family: "Cormorant Garamond", serif;
-      font-size: 1rem;
-      font-weight: 500;
-      letter-spacing: 0.02em;
+      border: 1px solid var(--accent);
+      border-radius: var(--radius-sm);
+      background: rgba(34, 211, 238, 0.12);
+      color: var(--accent);
+      font-family: var(--font);
+      font-size: 14px;
+      font-weight: 600;
       cursor: pointer;
       flex-shrink: 0;
-      transition: background 0.2s, color 0.2s;
+      transition: background 0.2s, border-color 0.2s, color 0.2s;
     }
     .browser-bar .go-btn:hover {
-      background: #333;
-      border-color: #333;
+      background: rgba(34, 211, 238, 0.2);
+      border-color: rgba(34, 211, 238, 0.5);
+      color: var(--ink);
     }
     .tabs-wrap {
       display: flex;
       align-items: flex-end;
       gap: 0;
-      padding: 0 24px 0;
-      background: #faf9f7;
-      border-bottom: 1px solid #e8e6e3;
+      padding: 0 20px 0;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
       overflow-x: auto;
       flex-shrink: 0;
     }
@@ -90,27 +103,27 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 14px 20px 12px;
+      padding: 12px 18px 10px;
       background: transparent;
       border: none;
       border-bottom: 2px solid transparent;
       cursor: pointer;
       max-width: 200px;
-      min-width: 100px;
+      min-width: 90px;
       flex-shrink: 0;
-      font-family: "DM Sans", system-ui, sans-serif;
-      font-size: 0.875rem;
-      font-weight: 400;
-      color: #6b6560;
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--muted);
       transition: color 0.2s, border-color 0.2s;
     }
     .tab:hover {
-      color: #1a1a1a;
+      color: var(--ink);
     }
     .tab.active {
-      color: #1a1a1a;
-      border-bottom-color: #1a1a1a;
-      font-weight: 500;
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+      font-weight: 600;
     }
     .tab .tab-title {
       overflow: hidden;
@@ -118,12 +131,12 @@
       white-space: nowrap;
     }
     .tab .tab-close {
-      width: 22px;
-      height: 22px;
+      width: 20px;
+      height: 20px;
       border: none;
-      border-radius: 4px;
+      border-radius: 6px;
       background: transparent;
-      color: #a39e99;
+      color: var(--muted);
       font-size: 1.1rem;
       line-height: 1;
       cursor: pointer;
@@ -131,28 +144,28 @@
       transition: color 0.2s, background 0.2s;
     }
     .tab .tab-close:hover {
-      background: #e8e6e3;
-      color: #1a1a1a;
+      background: rgba(34, 211, 238, 0.12);
+      color: var(--accent);
     }
     .tab-new {
-      padding: 14px 18px 12px;
+      padding: 12px 16px 10px;
       border: none;
       border-bottom: 2px solid transparent;
       background: transparent;
-      color: #a39e99;
+      color: var(--muted);
       font-size: 1.25rem;
       cursor: pointer;
       flex-shrink: 0;
       transition: color 0.2s;
     }
     .tab-new:hover {
-      color: #1a1a1a;
+      color: var(--accent);
     }
     .frame-wrap {
       flex: 1;
       position: relative;
       min-height: 0;
-      background: #fff;
+      background: var(--bg);
     }
     .frame-wrap iframe {
       position: absolute;
@@ -161,7 +174,7 @@
       width: 100%;
       height: 100%;
       border: none;
-      background: #fff;
+      background: var(--bg);
     }
     .frame-wrap iframe.hidden {
       visibility: hidden;
@@ -169,8 +182,9 @@
     }
   </style>
 </head>
-<body>
+<body class="browser-page">
   <div class="browser-bar">
+    <a href="index.html" class="browser-back" aria-label="Back to Play">← Back</a>
     <div class="addr-wrap">
       <input type="text" id="addr" placeholder="Search or enter any URL (proxied)" spellcheck="false" />
       <button type="button" class="go-btn" id="go">Go</button>

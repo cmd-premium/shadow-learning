@@ -487,6 +487,10 @@ function openClassicGame(slug) {
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
+function openRoblox() {
+  window.open("https://www.roblox.com", "_blank", "noopener,noreferrer");
+}
+
 var gamesGrid = document.querySelector(".games-grid");
 if (gamesGrid) {
   gamesGrid.addEventListener("click", function(e) {
@@ -496,6 +500,8 @@ if (gamesGrid) {
     if (!id) return;
     if (id.indexOf("ugs:") === 0) {
       openUgsGame(id.slice(4));
+    } else if (id === "roblox") {
+      openRoblox();
     } else if (getGameHtml(id)) {
       openGameById(id);
     } else {
@@ -559,42 +565,7 @@ function populateGameLists() {
     btn.setAttribute("data-game-id", "ugs:" + fileId);
     btn.innerHTML = "<span class=\"game-num\">" + num + "</span><span class=\"game-meta\"><span class=\"game-title\">" + title + "</span><span class=\"game-tagline\">Open in new tab.</span></span><span class=\"game-arrow\">→</span>";
     return btn;
-  }, function() {
-    // 2. After UGS done, fetch and add Classic Game Zone in chunks
-    function escapeHtml(s) {
-      var div = document.createElement("div");
-      div.textContent = s;
-      return div.innerHTML;
-    }
-    var jsonUrl = (document.querySelector("base") && document.querySelector("base").getAttribute("href")) || (location.pathname.replace(/\/[^/]*$/, "/") || "/";
-    jsonUrl = (jsonUrl.lastIndexOf("/") === jsonUrl.length - 1 ? jsonUrl : jsonUrl + "/") + "classicgamezone-games.json";
-    fetch(jsonUrl)
-      .then(function(r) { return r.ok ? r.json() : []; })
-      .catch(function() { return []; })
-      .then(function(fromFile) {
-        var list = Array.isArray(fromFile) ? fromFile : [];
-        if (list.length === 0) {
-          return fetch("/api/classic-games").then(function(r) { return r.ok ? r.json() : []; }).catch(function() { return []; })
-            .then(function(fromApi) { return Array.isArray(fromApi) ? fromApi : []; });
-        }
-        return list;
-      })
-      .then(function(list) {
-        if (!list.length) { filterGamesBySearch(); return; }
-        addButtonsInChunks(list, function(game, i) {
-          var slug = game.slug || "";
-          var title = (game.title || slug).replace(/\s+/g, " ").trim();
-          if (title.length > 50) title = title.slice(0, 47) + "...";
-          var startNum = gamesGrid.querySelectorAll(".game-button").length + 1;
-          var num = String(startNum + i).padStart(2, "0");
-          var btn = document.createElement("button");
-          btn.className = "game-button";
-          btn.setAttribute("data-game-id", slug);
-          btn.innerHTML = "<span class=\"game-num\">" + num + "</span><span class=\"game-meta\"><span class=\"game-title\">" + escapeHtml(title) + "</span><span class=\"game-tagline\">Classic Game Zone · Play in browser</span></span><span class=\"game-arrow\">→</span>";
-          return btn;
-        }, filterGamesBySearch);
-      });
-  });
+  }, filterGamesBySearch);
 }
 
 window._shadowLearningOnReady = populateGameLists;
