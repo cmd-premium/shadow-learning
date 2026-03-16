@@ -9,8 +9,8 @@
         document.write('<base href="' + location.origin + path + '">');
       })();
     </script>
-    <title>Shadow Learning</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='fg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' stop-color='%2322d3ee'/><stop offset='100%25' stop-color='%23a78bfa'/></linearGradient></defs><rect width='32' height='32' rx='8' fill='%23050810'/><text x='16' y='22' font-size='16' text-anchor='middle' font-weight='bold' font-family='system-ui,sans-serif' fill='url(%23fg)'>S</text></svg>" />
+    <title>Home - Classroom</title>
+    <link rel="icon" href="https://media.discordapp.net/attachments/1133385262903328821/1481443467447111791/image-removebg-preview_6.png?ex=69b89b3e&is=69b749be&hm=cc2556e90eb01bc586268ff3835bb8642c585569de6e43f6bb2f17c7a6527844&=&format=webp&quality=lossless&width=1250&height=1250" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -225,9 +225,31 @@
         text-transform: uppercase;
         margin-bottom: 8px;
       }
+      .classroom-wrap {
+        position: fixed;
+        inset: 0;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1;
+      }
+      .classroom-wrap iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        display: block;
+      }
+      .show-btn {
+        display: none !important;
+      }
+      body.classroom-view .edu-header,
+      body.classroom-view .edu-main {
+        display: none !important;
+      }
     </style>
   </head>
-  <body>
+  <body class="classroom-view">
     <script>
       try {
         if (localStorage.getItem("sl_unlocked") !== "1") {
@@ -237,6 +259,11 @@
         window.location.replace("index.html");
       }
     </script>
+    <div class="classroom-wrap">
+      <iframe src="https://classroom.google.com" title="Google Classroom"></iframe>
+    </div>
+    <button type="button" class="show-btn" id="show-btn" aria-hidden="true">Show</button>
+
     <header class="edu-header">
       <div class="edu-header-inner">
         <span class="edu-badge" aria-hidden="true">Premium</span>

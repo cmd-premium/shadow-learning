@@ -291,7 +291,9 @@ class Tab {
     } else {
       icon = `https://www.google.com/s2/favicons/imgs/icons?domain=${src}&sz=24`;
     }
-    const title = this.tabsArr[this.activeTabIndex].title || this.tabsArr[i].iframe.contentDocument.title;
+    const title = src === "about:blank"
+      ? "New Tab"
+      : (this.tabsArr[this.activeTabIndex].title || this.tabsArr[i].iframe.contentDocument?.title || "New Tab");
 
     const obj = {
       title,

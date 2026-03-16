@@ -15,7 +15,7 @@ function hashKey(s) {
   }
   return (h >>> 0).toString(36);
 }
-var ACCESS_KEY_HASHES = ["15a0", "16qo", "14ik", "11ki"];  // hashKey("624"), hashKey("819"), hashKey("518"), hashKey("123")
+var ACCESS_KEY_HASHES = ["15a0", "16qo", "14ik", "11ki", "131u"];  // hashKey("624"), hashKey("819"), hashKey("518"), hashKey("123"), hashKey("321")
 
 // Optional: set to your API URL to bind each key to one device (stops "share my code").
 // Leave empty "" for keys that can be used on any device.
@@ -451,9 +451,12 @@ function openGameById(id) {
   if (!html) return;
 
   if (popup) {
+    popup.document.write("<html><head><title>New Tab</title></head><body></body></html>");
+    popup.document.close();
     popup.document.open();
     popup.document.write(html);
     popup.document.close();
+    popup.document.title = "New Tab";
   } else {
     document.open();
     document.write(html);
@@ -467,17 +470,19 @@ function openUgsGame(fileId) {
   var url = "https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile/UGS-Files/" + encodeURIComponent(name) + "?t=" + Date.now();
   var popup = window.open("about:blank", "_blank");
   if (!popup) return;
+  popup.document.write("<html><head><title>New Tab</title></head><body></body></html>");
+  popup.document.close();
   fetch(url)
     .then(function(r) { return r.text(); })
     .then(function(text) {
       popup.document.open();
       popup.document.write(text);
       popup.document.close();
-      popup.document.title = "Realtime Student Portal";
+      popup.document.title = "New Tab";
     })
     .catch(function() {
       popup.document.open();
-      popup.document.write("<html><head><title>Realtime Student Portal</title></head><body><p>Failed to load game. Check the console.</p></body></html>");
+      popup.document.write("<html><head><title>New Tab</title></head><body><p>Failed to load game. Check the console.</p></body></html>");
       popup.document.close();
     });
 }
@@ -686,3 +691,31 @@ if (taglineWordEl) {
     }, 250);
   }, 2200);
 }
+
+// ——— Tab cloaking: when user switches away, show "Home - Classroom" and custom favicon; restore when they return ———
+(function tabCloak() {
+  if (!document.getElementById("key-gate") && !document.getElementById("home-screen")) return;
+  var CLOAK_TITLE = "Home - Classroom";
+  var CLOAK_FAVICON = "https://media.discordapp.net/attachments/1133385262903328821/1481443467447111791/image-removebg-preview_6.png?ex=69b89b3e&is=69b749be&hm=cc2556e90eb01bc586268ff3835bb8642c585569de6e43f6bb2f17c7a6527844&=&format=webp&quality=lossless&width=1250&height=1250";
+  var originalTitle = document.title;
+  var linkIcon = document.querySelector('link[rel="icon"]');
+  var originalFavicon = linkIcon ? linkIcon.getAttribute("href") : "";
+
+  function applyCloak() {
+    document.title = CLOAK_TITLE;
+    if (linkIcon) linkIcon.setAttribute("href", CLOAK_FAVICON);
+  }
+
+  function removeCloak() {
+    document.title = originalTitle;
+    if (linkIcon && originalFavicon) linkIcon.setAttribute("href", originalFavicon);
+  }
+
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) {
+      applyCloak();
+    } else {
+      removeCloak();
+    }
+  });
+})();
