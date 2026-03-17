@@ -508,6 +508,36 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Cloak favicon: proxy Discord image so it loads when CDN is blocked (e.g. school network)
+  if (url === "/cloak-favicon" || url === "/cloak-favicon.png") {
+    const CLOAK_FAVICON_URL = "https://media.discordapp.net/attachments/1133385262903328821/1481443467447111791/image-removebg-preview_6.png?ex=69b89b3e&is=69b749be&hm=cc2556e90eb01bc586268ff3835bb8642c585569de6e43f6bb2f17c7a6527844&=&format=webp&quality=lossless&width=1250&height=1250";
+    const reqUrl = urlModule.parse(CLOAK_FAVICON_URL);
+    const proxyReq = https.request(
+      {
+        hostname: reqUrl.hostname,
+        path: reqUrl.path,
+        method: "GET",
+        headers: { "Accept": "image/*" }
+      },
+      (proxyRes) => {
+        if (proxyRes.statusCode !== 200) {
+          res.writeHead(502, { "Content-Type": "text/plain" });
+          res.end("Unavailable");
+          return;
+        }
+        const ct = proxyRes.headers["content-type"] || "image/png";
+        res.writeHead(200, { "Content-Type": ct, "Cache-Control": "public, max-age=86400" });
+        proxyRes.pipe(res);
+      }
+    );
+    proxyReq.on("error", () => {
+      res.writeHead(502, { "Content-Type": "text/plain" });
+      res.end("Unavailable");
+    });
+    proxyReq.end();
+    return;
+  }
+
   // Reset device bindings (optional: set RESET_BINDINGS_SECRET in env)
   if (url === "/reset-bindings" && process.env.RESET_BINDINGS_SECRET) {
     if (req.method !== "POST") {
