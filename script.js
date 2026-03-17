@@ -45,15 +45,7 @@ function getDeviceFingerprint() {
 
 function isUnlocked() {
   try {
-    if (localStorage.getItem("sl_unlocked") !== "1") return false;
-    var storedFp = localStorage.getItem("sl_fp");
-    var currentFp = getDeviceFingerprint();
-    if (!storedFp || storedFp !== currentFp) {
-      localStorage.removeItem("sl_unlocked");
-      localStorage.removeItem("sl_fp");
-      return false;
-    }
-    return true;
+    return localStorage.getItem("sl_unlocked") === "1";
   } catch (e) {
     return false;
   }
@@ -111,13 +103,15 @@ var SHADOW_LOADING_MS = 1800;
   }, SHADOW_LOADING_MS);
 })();
 
-// ——— Key gate: submit key to unlock (optional server binds key to one device) ———
+// Key gate: POST key + device to validate endpoint (server runs codes.js logic via /api/validate-license)
 (function keyGate() {
   var form = document.getElementById("key-form");
   var input = document.getElementById("key-input");
   var errorEl = document.getElementById("key-error");
   var submitBtn = form ? form.querySelector(".key-submit") : null;
   if (!form || !input) return;
+
+  var validateUrl = (typeof VALIDATE_LICENSE_URL === "string" && VALIDATE_LICENSE_URL.trim()) ? VALIDATE_LICENSE_URL.trim() : (location.origin + "/api/validate-license");
 
   form.addEventListener("submit", function (e) {
     e.preventDefault();
@@ -127,110 +121,45 @@ var SHADOW_LOADING_MS = 1800;
       errorEl.hidden = true;
       errorEl.textContent = "";
     }
-    var keyHash = hashKey(key);
-    var fp = getDeviceFingerprint() || "unknown";
-
-    function logToSheet(status, errMsg) {
-      var sheetUrl = (typeof LOG_TO_SHEET_URL === "string" && LOG_TO_SHEET_URL.trim()) ? LOG_TO_SHEET_URL.trim() : "";
-      if (!sheetUrl) return;
-      fetch(sheetUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          key: key,
-          keyHash: keyHash,
-          fingerprint: fp,
-          status: status,
-          error: errMsg || ""
-        })
-      }).catch(function () {});
-    }
-
-    var serverUrl = (typeof KEY_SERVER_URL === "string" && KEY_SERVER_URL.trim()) ? KEY_SERVER_URL.trim() : "";
-    var useServer = !!serverUrl;
-
-    if (!useServer && ACCESS_KEY_HASHES.indexOf(keyHash) === -1) {
-      logToSheet("fail", "Invalid key");
+    if (!key) {
       input.classList.add("error");
       if (errorEl) {
-        errorEl.textContent = "Invalid key. Please try again.";
+        errorEl.textContent = "Enter a key.";
         errorEl.hidden = false;
       }
       input.focus();
       return;
     }
-
-    function unlock() {
-      logToSheet("success");
-      setUnlocked(keyHash);
-      document.body.classList.remove("key-gate-visible");
-      document.body.classList.add("home-visible");
-    }
-
-    if (!serverUrl) {
-      unlock();
-      return;
-    }
-
     if (submitBtn) {
       submitBtn.disabled = true;
       submitBtn.textContent = "Checking...";
     }
-    var fingerprint = getDeviceFingerprint() || "unknown";
-    fetch(serverUrl, {
+    var device = getDeviceFingerprint() || "unknown";
+    fetch(validateUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        keyHash: keyHash,
-        fingerprint: fingerprint
-      })
+      body: JSON.stringify({ key: key, device: device })
     })
-      .then(function (res) {
-        return res.text().then(function (text) {
-          var data = {};
-          try {
-            if (text && text.trim()) data = JSON.parse(text);
-          } catch (e) {}
-          return { ok: res.ok, status: res.status, data: data };
-        });
-      })
-      .then(function (result) {
-        if (!result) {
-          if (errorEl) {
-            errorEl.textContent = "Could not verify key. Try again or check your connection.";
-            errorEl.hidden = false;
-          }
-          input.focus();
-          return;
-        }
-        var serverOk = result.data && result.data.ok === true;
-        var serverError = result.data && result.data.error;
-        if (serverOk) {
-          unlock();
-          updateStaffVisibility();
-          return;
-        }
-        if (serverError) {
-          logToSheet("fail", serverError);
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var valid = data && (data.valid === true || data.result === "VALID" || data.ok === true);
+        if (valid) {
+          setUnlocked(hashKey(key));
+          document.body.classList.remove("key-gate-visible");
+          document.body.classList.add("home-visible");
+          if (typeof updateStaffVisibility === "function") updateStaffVisibility();
+        } else {
           input.classList.add("error");
           if (errorEl) {
-            errorEl.textContent = serverError;
+            errorEl.textContent = (data && (data.error || data.message)) || "Invalid key.";
             errorEl.hidden = false;
           }
           input.focus();
-          return;
         }
-        if (errorEl) {
-          errorEl.textContent = result.status >= 500
-            ? "Server error. Please try again later."
-            : "Could not verify key. Check your connection and try again.";
-          errorEl.hidden = false;
-        }
-        input.focus();
       })
-      .catch(function () {
+      .catch(function (err) {
         if (errorEl) {
-          errorEl.textContent = "Could not verify key. Check your connection and try again.";
+          errorEl.textContent = "Could not verify key. Try again or check your connection.";
           errorEl.hidden = false;
         }
         input.focus();

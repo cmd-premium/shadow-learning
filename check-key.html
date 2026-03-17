@@ -19,37 +19,17 @@
 </head>
 <body>
   <h1>Check key</h1>
-  <p>Submit a key to the <code>/check-key</code> API (same as the main site). Use this page when the site is served from <code>server.js</code>.</p>
+  <p>Enter a code and click Check to open the LicenseGate verify URL for that code.</p>
   <form id="form">
     <label for="key">Access key</label>
     <input type="text" id="key" name="key" placeholder="e.g. 624" autocomplete="off">
-    <button type="submit">Check key</button>
+    <button type="submit">Check</button>
   </form>
   <div id="result" class="hidden"></div>
 
   <script>
-    function hashKey(s) {
-      var h = 0, str = String(s).trim();
-      for (var i = 0; i < str.length; i++) {
-        h = ((h << 5) - h) + str.charCodeAt(i) | 0;
-      }
-      return (h >>> 0).toString(36);
-    }
-    function getDeviceFingerprint() {
-      try {
-        var n = navigator || {}, s = screen || {};
-        var parts = [
-          n.userAgent || "",
-          (s.width || 0) + "x" + (s.height || 0),
-          (new Date().getTimezoneOffset()),
-          n.language || "",
-          (n.hardwareConcurrency || "") + (n.deviceMemory || "")
-        ];
-        return hashKey(parts.join("|"));
-      } catch (e) {
-        return "";
-      }
-    }
+    var PRODUCT_ID = "a2550";
+    var VERIFY_API_BASE = "https://api.licensegate.io/license";
 
     var form = document.getElementById("form");
     var result = document.getElementById("result");
@@ -58,38 +38,14 @@
       e.preventDefault();
       var key = (document.getElementById("key").value || "").trim();
       if (!key) {
+        result.classList.remove("hidden");
         result.className = "err";
         result.textContent = "Enter a key.";
-        result.classList.remove("hidden");
         return;
       }
 
-      var keyHash = hashKey(key);
-      var fingerprint = getDeviceFingerprint();
-
-      result.classList.remove("hidden");
-      result.className = "";
-      result.textContent = "Sending…";
-
-      fetch("/check-key", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keyHash: keyHash, fingerprint: fingerprint })
-      })
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-          if (data.ok) {
-            result.className = "ok";
-            result.textContent = "OK — key is valid and bound to this device.";
-          } else {
-            result.className = "err";
-            result.textContent = data.error || "Request failed.";
-          }
-        })
-        .catch(function (err) {
-          result.className = "err";
-          result.textContent = "Error: " + (err.message || "Could not reach /check-key. Is server.js running?");
-        });
+      var verifyUrl = VERIFY_API_BASE + "/" + PRODUCT_ID + "/" + encodeURIComponent(key) + "/verify";
+      window.location.href = verifyUrl;
     });
   </script>
 </body>

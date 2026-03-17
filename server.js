@@ -65,6 +65,17 @@ const HASH_TO_CODE = { "15a0": "624", "16qo": "819", "14ik": "518", "11ki": "123
 
 const VALID_KEY_HASHES = ["15a0", "16qo", "14ik", "11ki"];
 
+// LicenseGate (codes.js): product id for /check-key when verifying with api.licensegate.io
+const LICENSEGATE_PRODUCT_ID = process.env.LICENSEGATE_PRODUCT_ID || "a2550";
+
+function verifyCodeWithLicenseGate(code) {
+  const url = `https://api.licensegate.io/license/${LICENSEGATE_PRODUCT_ID}/${encodeURIComponent(code)}/verify`;
+  return fetch(url)
+    .then((res) => res.json())
+    .then((data) => data.valid === true)
+    .catch(() => false);
+}
+
 function appendHwidLog(keyHash, fingerprint) {
   const code = HASH_TO_CODE[keyHash] || keyHash;
   const line = JSON.stringify({
@@ -159,7 +170,8 @@ function saveConsumedKeys(arr) {
 }
 
 // Reset all key→device bindings so every code can be used on a new device.
-// Set env RESET_BINDINGS=true (or 1), then restart/redeploy. Remove it after one run.
+// Option A: Set env RESET_BINDINGS=true (or 1), then restart/redeploy. Remove it after one run.
+// Option B: POST /reset-bindings with header X-Reset-Secret: <RESET_BINDINGS_SECRET> (if that env is set).
 if (process.env.RESET_BINDINGS === "true" || process.env.RESET_BINDINGS === "1") {
   saveBindings({});
   console.log("Bindings reset (all codes cleared for new devices). Remove RESET_BINDINGS after this run.");
@@ -438,6 +450,84 @@ const server = http.createServer((req, res) => {
   const url = parsedUrl.pathname || "/";
   const query = parsedUrl.query || {};
 
+  // LicenseGate v2 validate (mirrors codes.js handler: key + device → LicenseGate API → return JSON)
+  if (url === "/api/validate-license" || url === "/validate-license") {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    if (req.method === "OPTIONS") {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+    if (req.method !== "POST") {
+      res.writeHead(405, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: false, error: "Method not allowed" }));
+      return;
+    }
+    let body = "";
+    req.on("data", (chunk) => { body += chunk; });
+    req.on("end", () => {
+      let key, device;
+      try {
+        const data = JSON.parse(body || "{}");
+        key = data.key;
+        device = data.device || data.fingerprint || "unknown";
+      } catch (e) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: false, error: "Invalid request" }));
+        return;
+      }
+      const apiKey = process.env.LICENSEGATE_API_KEY || process.env.LICENSEGATE_BEARER || "";
+      if (!apiKey) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: false, error: "Server missing LICENSEGATE_API_KEY" }));
+        return;
+      }
+      fetch("https://api.licensegate.io/v2/licenses/validate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + apiKey
+        },
+        body: JSON.stringify({
+          license_key: key,
+          fingerprint: device
+        })
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(data));
+        })
+        .catch((err) => {
+          res.writeHead(502, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: false, error: err.message || "License check failed" }));
+        });
+    });
+    return;
+  }
+
+  // Reset device bindings (optional: set RESET_BINDINGS_SECRET in env)
+  if (url === "/reset-bindings" && process.env.RESET_BINDINGS_SECRET) {
+    if (req.method !== "POST") {
+      res.writeHead(405, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: false, error: "Method not allowed" }));
+      return;
+    }
+    const secret = req.headers["x-reset-secret"] || (parsedUrl.query && parsedUrl.query.secret);
+    if (secret !== process.env.RESET_BINDINGS_SECRET) {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: false, error: "Forbidden" }));
+      return;
+    }
+    saveBindings({});
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ ok: true, message: "All device bindings cleared. Codes can be used on any device again." }));
+    console.log("Bindings reset via /reset-bindings");
+    return;
+  }
+
   // Key-check API
   if (url === "/check-key") {
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -459,48 +549,76 @@ const server = http.createServer((req, res) => {
     let body = "";
     req.on("data", (chunk) => { body += chunk; });
     req.on("end", () => {
-      let keyHash, fingerprint;
+      let keyHash, fingerprint, code;
       try {
         const data = JSON.parse(body);
         keyHash = data.keyHash;
         fingerprint = data.fingerprint;
+        code = data.code;
       } catch (e) {
         res.writeHead(400, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ok: false, error: "Invalid request" }));
         return;
       }
 
-      if (!keyHash) {
-        res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: false, error: "Missing keyHash" }));
-        return;
-      }
       fingerprint = fingerprint || "unknown";
 
-      if (VALID_KEY_HASHES.indexOf(keyHash) === -1) {
+      function respondOk() {
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: false, error: "Invalid key." }));
+        res.end(JSON.stringify({ ok: true }));
+      }
+      function respondErr(msg) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: false, error: msg }));
+      }
+
+      // Path 1: code sent → verify with LicenseGate (codes.js system)
+      if (code != null && String(code).trim() !== "") {
+        const normalizedCode = normalizeKeyServer(String(code).trim());
+        if (!normalizedCode) {
+          respondErr("Invalid key.");
+          return;
+        }
+        const computedHash = hashKeyServer(normalizedCode);
+        verifyCodeWithLicenseGate(normalizedCode).then((valid) => {
+          if (!valid) {
+            respondErr("Invalid key.");
+            return;
+          }
+          const bindings = loadBindings();
+          const existing = bindings[computedHash];
+          if (existing && existing !== fingerprint) {
+            respondErr("This key is already in use on another device.");
+            return;
+          }
+          bindings[computedHash] = fingerprint;
+          saveBindings(bindings);
+          appendHwidLog(computedHash, fingerprint);
+          respondOk();
+        });
         return;
       }
 
+      // Path 2: keyHash only (legacy)
+      if (!keyHash) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: false, error: "Missing keyHash or code" }));
+        return;
+      }
+      if (VALID_KEY_HASHES.indexOf(keyHash) === -1) {
+        respondErr("Invalid key.");
+        return;
+      }
       const bindings = loadBindings();
       const existing = bindings[keyHash];
-
       if (existing && existing !== fingerprint) {
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({
-          ok: false,
-          error: "This key is already in use on another device."
-        }));
+        respondErr("This key is already in use on another device.");
         return;
       }
-
       bindings[keyHash] = fingerprint;
       saveBindings(bindings);
       appendHwidLog(keyHash, fingerprint);
-
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ ok: true }));
+      respondOk();
     });
     return;
   }

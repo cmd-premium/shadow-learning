@@ -31,6 +31,7 @@ Add:
 | Variable | Value |
 |----------|--------|
 | `LOG_TO_SHEET_APP_URL` | Your Google Apps Script Web App URL (for key logging) |
+| `LICENSEGATE_API_KEY` | Your LicenseGate API Bearer token (for key gate validate; used by `/api/validate-license`) |
 
 (Use your real Apps Script Web App URL if different.)
 
@@ -76,13 +77,26 @@ TodoWrite
 
 ---
 
-## Reset all codes (new devices can use them again)
+## Reset all devices on the codes (unbind every key)
+
+**Option A – Redeploy with env var**
 
 1. In Railway: your service → **Variables** → Add **RESET_BINDINGS** = **true**.
 2. **Redeploy** (Deployments → Redeploy, or push a commit).
-3. After the deploy has run once, **remove** the variable **RESET_BINDINGS** (or set it to **false**) so the next deploy doesn't clear bindings again.
+3. After the deploy has run once, **remove** **RESET_BINDINGS** (or set to **false**) so the next deploy doesn’t clear bindings again.
 
-All keys (624, 819, 518) are then unbound; the next device to use each key will get it.
+**Option B – One-time secret URL (no redeploy)**
+
+1. In Railway: **Variables** → Add **RESET_BINDINGS_SECRET** = a long random string you choose (e.g. `mySecretReset2024xyz`).
+2. Redeploy once so the server has the secret.
+3. To reset all device bindings, send a POST with the secret, for example:
+   ```bash
+   curl -X POST "https://YOUR-RAILWAY-URL.up.railway.app/reset-bindings" -H "X-Reset-Secret: mySecretReset2024xyz"
+   ```
+   Or in a browser, you can use a simple HTML form or a fetch from the console. The secret can be in the header **X-Reset-Secret** or in the query: `POST /reset-bindings?secret=mySecretReset2024xyz`.
+4. After that, all codes are unbound; any device can use each code again.
+
+You can leave **RESET_BINDINGS_SECRET** set so you can run a reset anytime without redeploying.
 
 ---
 
