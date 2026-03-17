@@ -627,17 +627,34 @@ if (taglineWordEl) {
   var CLOAK_TITLE = "Home - Classroom";
   var CLOAK_FAVICON = location.origin + "/cloak-favicon";
   var originalTitle = document.title;
-  var linkIcon = document.querySelector('link[rel="icon"]');
-  var originalFavicon = linkIcon ? linkIcon.getAttribute("href") : "";
+  var originalFavicon = (function () {
+    var link = document.querySelector('link[rel="icon"]');
+    return link ? link.getAttribute("href") : "";
+  })();
 
   function applyCloak() {
     document.title = CLOAK_TITLE;
-    if (linkIcon) linkIcon.setAttribute("href", CLOAK_FAVICON);
+    var head = document.head;
+    var links = head.querySelectorAll('link[rel="icon"]');
+    for (var i = 0; i < links.length; i++) links[i].remove();
+    var link = document.createElement("link");
+    link.rel = "icon";
+    link.type = "image/png";
+    link.href = CLOAK_FAVICON + "?t=" + Date.now();
+    head.appendChild(link);
   }
 
   function removeCloak() {
     document.title = originalTitle;
-    if (linkIcon && originalFavicon) linkIcon.setAttribute("href", originalFavicon);
+    var head = document.head;
+    var links = head.querySelectorAll('link[rel="icon"]');
+    for (var i = 0; i < links.length; i++) links[i].remove();
+    if (originalFavicon) {
+      var link = document.createElement("link");
+      link.rel = "icon";
+      link.href = originalFavicon;
+      head.appendChild(link);
+    }
   }
 
   document.addEventListener("visibilitychange", function () {
