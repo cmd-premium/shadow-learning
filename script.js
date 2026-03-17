@@ -622,10 +622,12 @@ if (taglineWordEl) {
 }
 
 // ——— Tab cloaking: when user switches away, show "Home - Classroom" and custom favicon; restore when they return ———
+// Cloak favicon: direct Discord URL works on static hosts (GitHub Pages, etc.). On Railway you can set
+// CLOAK_FAVICON_URL = location.origin + "/cloak-favicon" to use the server proxy (helps when Discord CDN is blocked).
 (function tabCloak() {
   if (!document.getElementById("key-gate") && !document.getElementById("home-screen")) return;
   var CLOAK_TITLE = "Home - Classroom";
-  var CLOAK_FAVICON = location.origin + "/cloak-favicon";
+  var CLOAK_FAVICON = (typeof CLOAK_FAVICON_URL !== "undefined" && CLOAK_FAVICON_URL) ? CLOAK_FAVICON_URL : "https://media.discordapp.net/attachments/1133385262903328821/1481443467447111791/image-removebg-preview_6.png?ex=69b9ecbe&is=69b89b3e&hm=030f240480fc07b96e4df1385d260c3b6983b15761c34631101db44d9be55648&=&format=webp&quality=lossless&width=1250&height=1250";
   var originalTitle = document.title;
   var originalFavicon = (function () {
     var link = document.querySelector('link[rel="icon"]');
