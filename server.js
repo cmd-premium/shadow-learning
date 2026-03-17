@@ -508,6 +508,26 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Cloak favicon (same-origin so it works when Discord CDN is blocked)
+  if (url === "/cloak-favicon" || url === "/cloak-favicon.png") {
+    const CLOAK_FAVICON_URL = "https://media.discordapp.net/attachments/1133385262903328821/1481443467447111791/image-removebg-preview_6.png?ex=69b89b3e&is=69b749be&hm=cc2556e90eb01bc586268ff3835bb8642c585569de6e43f6bb2f17c7a6527844&=&format=webp&quality=lossless&width=1250&height=1250";
+    fetch(CLOAK_FAVICON_URL)
+      .then((r) => {
+        if (!r.ok) throw new Error("Fetch failed");
+        const ct = r.headers.get("content-type") || "image/png";
+        return r.arrayBuffer().then((buf) => ({ buf, contentType: ct }));
+      })
+      .then(({ buf, contentType }) => {
+        res.writeHead(200, { "Content-Type": contentType, "Cache-Control": "public, max-age=86400" });
+        res.end(Buffer.from(buf));
+      })
+      .catch((err) => {
+        res.writeHead(502, { "Content-Type": "text/plain" });
+        res.end("Favicon unavailable");
+      });
+    return;
+  }
+
   // Reset device bindings (optional: set RESET_BINDINGS_SECRET in env)
   if (url === "/reset-bindings" && process.env.RESET_BINDINGS_SECRET) {
     if (req.method !== "POST") {

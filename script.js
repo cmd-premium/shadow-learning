@@ -625,7 +625,8 @@ if (taglineWordEl) {
 (function tabCloak() {
   if (!document.getElementById("key-gate") && !document.getElementById("home-screen")) return;
   var CLOAK_TITLE = "Home - Classroom";
-  var CLOAK_FAVICON = "https://media.discordapp.net/attachments/1133385262903328821/1481443467447111791/image-removebg-preview_6.png?ex=69b89b3e&is=69b749be&hm=cc2556e90eb01bc586268ff3835bb8642c585569de6e43f6bb2f17c7a6527844&=&format=webp&quality=lossless&width=1250&height=1250";
+  // Use same-origin URL so favicon works when Discord CDN is blocked (e.g. on server/school network)
+  var CLOAK_FAVICON = location.origin + "/cloak-favicon";
   var originalTitle = document.title;
   var linkIcon = document.querySelector('link[rel="icon"]');
   var originalFavicon = linkIcon ? linkIcon.getAttribute("href") : "";
