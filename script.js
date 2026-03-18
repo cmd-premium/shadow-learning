@@ -26,10 +26,10 @@ var KEY_SERVER_URL = "https://shadow-learning-production.up.railway.app/check-ke
 // Use "/log-key" when running server.js (server forwards to Google). Or your Apps Script Web App URL.
 var LOG_TO_SHEET_URL = "https://shadow-learning-production.up.railway.app/log-key";
 
-// For GitHub Pages: key check uses your backend /api/verify (avoids CORS with LicenseGate). Set VALIDATE_LICENSE_URL yourself if you use a different backend.
-if (typeof VALIDATE_LICENSE_URL === "undefined" && typeof location !== "undefined" && location.hostname.indexOf("github.io") >= 0 && KEY_SERVER_URL && KEY_SERVER_URL.indexOf("http") === 0) {
+// When the site is not on the same server as KEY_SERVER_URL (e.g. GitHub Pages), use that server's /api/verify so key check works (avoids CORS).
+if (typeof VALIDATE_LICENSE_URL === "undefined" && typeof location !== "undefined" && KEY_SERVER_URL && KEY_SERVER_URL.indexOf("http") === 0) {
   var _base = KEY_SERVER_URL.match(/^(https?:\/\/[^/]+)/);
-  if (_base) var VALIDATE_LICENSE_URL = _base[1] + "/api/verify";
+  if (_base && location.origin !== _base[1]) var VALIDATE_LICENSE_URL = _base[1] + "/api/verify";
 }
 
 function getDeviceFingerprint() {
@@ -162,13 +162,20 @@ var SHADOW_LOADING_MS = 1800;
 
     if (useServerProxy) {
       var verifyUrl = (validateUrl.indexOf("?") >= 0 ? validateUrl + "&" : validateUrl + "?") + "code=" + encodeURIComponent(key);
-      fetch(verifyUrl)
-        .then(function (r) { return r.json(); })
+      fetch(verifyUrl, { method: "GET", mode: "cors" })
+        .then(function (r) {
+          var ct = r.headers.get("Content-Type") || "";
+          if (!r.ok) return r.text().then(function () { return { valid: false }; });
+          if (ct.indexOf("application/json") >= 0) return r.json();
+          return r.text().then(function () { return { valid: false }; });
+        })
         .then(function (data) {
           if (data && data.valid === true) onValid(key);
-          else onInvalid((data && data.message) || "Invalid key.");
+          else onInvalid((data && data.message) || (data && data.error) || "Invalid key.");
         })
-        .catch(function () { onInvalid("Could not verify key. Try again or check your connection."); })
+        .catch(function (err) {
+          onInvalid("Could not verify key. Try again or check your connection.");
+        })
         .then(done);
       return;
     }

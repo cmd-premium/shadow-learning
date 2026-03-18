@@ -509,9 +509,21 @@ const server = http.createServer((req, res) => {
   }
 
   // GET /api/verify?code=XXX — for static hosts (e.g. GitHub Pages) to avoid CORS with LicenseGate
-  if ((url === "/api/verify" || url === "/verify") && req.method === "GET") {
-    const code = query.code ? String(query.code).trim() : "";
+  if (url === "/api/verify" || url === "/verify") {
     res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+    res.setHeader("Access-Control-Max-Age", "86400");
+    if (req.method === "OPTIONS") {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+    if (req.method !== "GET") {
+      res.writeHead(405, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ valid: false, error: "Method not allowed" }));
+      return;
+    }
+    const code = query.code ? String(query.code).trim() : "";
     if (!code) {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ valid: false }));
