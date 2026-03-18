@@ -508,6 +508,27 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // GET /api/verify?code=XXX — for static hosts (e.g. GitHub Pages) to avoid CORS with LicenseGate
+  if ((url === "/api/verify" || url === "/verify") && req.method === "GET") {
+    const code = query.code ? String(query.code).trim() : "";
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    if (!code) {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ valid: false }));
+      return;
+    }
+    verifyCodeWithLicenseGate(code)
+      .then((valid) => {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ valid: !!valid }));
+      })
+      .catch(() => {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ valid: false }));
+      });
+    return;
+  }
+
   // Cloak favicon: proxy Discord image so it loads when CDN is blocked (e.g. school network)
   if (url === "/cloak-favicon" || url === "/cloak-favicon.png") {
     const CLOAK_FAVICON_URL = "https://media.discordapp.net/attachments/1133385262903328821/1481443467447111791/image-removebg-preview_6.png?ex=69bb3e3e&is=69b9ecbe&hm=0eeb1c9ba625353f447f0b26ac5108c7ace21d98387792bc5278e72a0c1a67cb&=&format=webp&quality=lossless&width=1250&height=1250";

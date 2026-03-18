@@ -26,6 +26,12 @@ var KEY_SERVER_URL = "https://shadow-learning-production.up.railway.app/check-ke
 // Use "/log-key" when running server.js (server forwards to Google). Or your Apps Script Web App URL.
 var LOG_TO_SHEET_URL = "https://shadow-learning-production.up.railway.app/log-key";
 
+// For GitHub Pages: key check uses your backend /api/verify (avoids CORS with LicenseGate). Set VALIDATE_LICENSE_URL yourself if you use a different backend.
+if (typeof VALIDATE_LICENSE_URL === "undefined" && typeof location !== "undefined" && location.hostname.indexOf("github.io") >= 0 && KEY_SERVER_URL && KEY_SERVER_URL.indexOf("http") === 0) {
+  var _base = KEY_SERVER_URL.match(/^(https?:\/\/[^/]+)/);
+  if (_base) var VALIDATE_LICENSE_URL = _base[1] + "/api/verify";
+}
+
 function getDeviceFingerprint() {
   try {
     var n = typeof navigator !== "undefined" ? navigator : {};
@@ -112,6 +118,7 @@ var SHADOW_LOADING_MS = 1800;
   if (!form || !input) return;
 
   var validateUrl = (typeof VALIDATE_LICENSE_URL === "string" && VALIDATE_LICENSE_URL.trim()) ? VALIDATE_LICENSE_URL.trim() : (location.origin + "/api/validate-license");
+  var useServerProxy = (typeof VALIDATE_LICENSE_URL === "string" && VALIDATE_LICENSE_URL.trim().length > 0);
 
   function onValid(key) {
     setUnlocked(hashKey(key));
@@ -151,6 +158,19 @@ var SHADOW_LOADING_MS = 1800;
     if (submitBtn) {
       submitBtn.disabled = true;
       submitBtn.textContent = "Checking...";
+    }
+
+    if (useServerProxy) {
+      var verifyUrl = (validateUrl.indexOf("?") >= 0 ? validateUrl + "&" : validateUrl + "?") + "code=" + encodeURIComponent(key);
+      fetch(verifyUrl)
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (data && data.valid === true) onValid(key);
+          else onInvalid((data && data.message) || "Invalid key.");
+        })
+        .catch(function () { onInvalid("Could not verify key. Try again or check your connection."); })
+        .then(done);
+      return;
     }
 
     if (typeof window.SHADOW_CHECK_CODE === "function") {
