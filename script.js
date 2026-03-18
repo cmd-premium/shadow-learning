@@ -621,49 +621,28 @@ if (taglineWordEl) {
   }, 2200);
 }
 
-// ——— Tab cloaking: when user switches away, show "Home - Classroom" and custom favicon; restore when they return ———
-// Cloak favicon: direct Discord URL works on static hosts (GitHub Pages, etc.). On Railway you can set
-// CLOAK_FAVICON_URL = location.origin + "/cloak-favicon" to use the server proxy (helps when Discord CDN is blocked).
+// ——— Tab cloaking: when user switches away, show "Home - Classroom" and cloak favicon; restore when they return ———
 (function tabCloak() {
   if (!document.getElementById("key-gate") && !document.getElementById("home-screen")) return;
   var CLOAK_TITLE = "Home - Classroom";
-  var CLOAK_FAVICON = (typeof CLOAK_FAVICON_URL !== "undefined" && CLOAK_FAVICON_URL) ? CLOAK_FAVICON_URL : "https://media.discordapp.net/attachments/1133385262903328821/1481443467447111791/image-removebg-preview_6.png?ex=69b9ecbe&is=69b89b3e&hm=030f240480fc07b96e4df1385d260c3b6983b15761c34631101db44d9be55648&=&format=webp&quality=lossless&width=1250&height=1250";
+  var CLOAK_FAVICON = "https://media.discordapp.net/attachments/1133385262903328821/1481443467447111791/image-removebg-preview_6.png?ex=69bb3e3e&is=69b9ecbe&hm=0eeb1c9ba625353f447f0b26ac5108c7ace21d98387792bc5278e72a0c1a67cb&=&format=webp&quality=lossless&width=1250&height=1250";
   var originalTitle = document.title;
-  var originalFavicon = (function () {
-    var link = document.querySelector('link[rel="icon"]');
-    return link ? link.getAttribute("href") : "";
-  })();
+  var linkIcon = document.querySelector('link[rel="icon"]') || document.querySelector('link[rel="shortcut icon"]');
+  var originalFavicon = linkIcon ? linkIcon.getAttribute("href") : "";
 
   function applyCloak() {
     document.title = CLOAK_TITLE;
-    var head = document.head;
-    var links = head.querySelectorAll('link[rel="icon"]');
-    for (var i = 0; i < links.length; i++) links[i].remove();
-    var link = document.createElement("link");
-    link.rel = "icon";
-    link.type = "image/png";
-    link.href = CLOAK_FAVICON + "?t=" + Date.now();
-    head.appendChild(link);
+    if (linkIcon) linkIcon.setAttribute("href", CLOAK_FAVICON);
   }
 
   function removeCloak() {
     document.title = originalTitle;
-    var head = document.head;
-    var links = head.querySelectorAll('link[rel="icon"]');
-    for (var i = 0; i < links.length; i++) links[i].remove();
-    if (originalFavicon) {
-      var link = document.createElement("link");
-      link.rel = "icon";
-      link.href = originalFavicon;
-      head.appendChild(link);
-    }
+    if (linkIcon && originalFavicon) linkIcon.setAttribute("href", originalFavicon);
   }
 
   document.addEventListener("visibilitychange", function () {
-    if (document.hidden) {
-      applyCloak();
-    } else {
-      removeCloak();
-    }
+    if (document.hidden) applyCloak(); else removeCloak();
   });
+  window.addEventListener("blur", applyCloak);
+  window.addEventListener("focus", removeCloak);
 })();
