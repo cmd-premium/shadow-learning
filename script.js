@@ -175,7 +175,8 @@ var SHADOW_LOADING_MS = 1800;
     }
 
     if (typeof window.SHADOW_CHECK_CODE === "function") {
-      window.SHADOW_CHECK_CODE(key)
+      var deviceId = getDeviceFingerprint() || "unknown";
+      window.SHADOW_CHECK_CODE(key, deviceId)
         .then(function (valid) {
           if (valid) onValid(key); else onInvalid("Invalid key.");
         })
