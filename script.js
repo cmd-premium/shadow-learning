@@ -103,7 +103,7 @@ var SHADOW_LOADING_MS = 1800;
   }, SHADOW_LOADING_MS);
 })();
 
-// Key gate: POST key + device to validate endpoint (server runs codes.js logic via /api/validate-license)
+// Key gate: uses codes.js (LicenseGate verify) when loaded, else POST to /api/validate-license
 (function keyGate() {
   var form = document.getElementById("key-form");
   var input = document.getElementById("key-input");
@@ -112,6 +112,29 @@ var SHADOW_LOADING_MS = 1800;
   if (!form || !input) return;
 
   var validateUrl = (typeof VALIDATE_LICENSE_URL === "string" && VALIDATE_LICENSE_URL.trim()) ? VALIDATE_LICENSE_URL.trim() : (location.origin + "/api/validate-license");
+
+  function onValid(key) {
+    setUnlocked(hashKey(key));
+    document.body.classList.remove("key-gate-visible");
+    document.body.classList.add("home-visible");
+    if (typeof updateStaffVisibility === "function") updateStaffVisibility();
+  }
+
+  function onInvalid(message) {
+    input.classList.add("error");
+    if (errorEl) {
+      errorEl.textContent = message || "Invalid key.";
+      errorEl.hidden = false;
+    }
+    input.focus();
+  }
+
+  function done() {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Unlock";
+    }
+  }
 
   form.addEventListener("submit", function (e) {
     e.preventDefault();
@@ -122,18 +145,24 @@ var SHADOW_LOADING_MS = 1800;
       errorEl.textContent = "";
     }
     if (!key) {
-      input.classList.add("error");
-      if (errorEl) {
-        errorEl.textContent = "Enter a key.";
-        errorEl.hidden = false;
-      }
-      input.focus();
+      onInvalid("Enter a key.");
       return;
     }
     if (submitBtn) {
       submitBtn.disabled = true;
       submitBtn.textContent = "Checking...";
     }
+
+    if (typeof window.SHADOW_CHECK_CODE === "function") {
+      window.SHADOW_CHECK_CODE(key)
+        .then(function (valid) {
+          if (valid) onValid(key); else onInvalid("Invalid key.");
+        })
+        .catch(function () { onInvalid("Could not verify key. Try again or check your connection."); })
+        .then(done);
+      return;
+    }
+
     var device = getDeviceFingerprint() || "unknown";
     fetch(validateUrl, {
       method: "POST",
@@ -143,33 +172,11 @@ var SHADOW_LOADING_MS = 1800;
       .then(function (r) { return r.json(); })
       .then(function (data) {
         var valid = data && (data.valid === true || data.result === "VALID" || data.ok === true);
-        if (valid) {
-          setUnlocked(hashKey(key));
-          document.body.classList.remove("key-gate-visible");
-          document.body.classList.add("home-visible");
-          if (typeof updateStaffVisibility === "function") updateStaffVisibility();
-        } else {
-          input.classList.add("error");
-          if (errorEl) {
-            errorEl.textContent = (data && (data.error || data.message)) || "Invalid key.";
-            errorEl.hidden = false;
-          }
-          input.focus();
-        }
+        if (valid) onValid(key);
+        else onInvalid((data && (data.error || data.message)) || "Invalid key.");
       })
-      .catch(function (err) {
-        if (errorEl) {
-          errorEl.textContent = "Could not verify key. Try again or check your connection.";
-          errorEl.hidden = false;
-        }
-        input.focus();
-      })
-      .then(function () {
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.textContent = "Unlock";
-        }
-      });
+      .catch(function () { onInvalid("Could not verify key. Try again or check your connection."); })
+      .then(done);
   });
 })();
 
