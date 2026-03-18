@@ -26,12 +26,6 @@ var KEY_SERVER_URL = "https://shadow-learning-production.up.railway.app/check-ke
 // Use "/log-key" when running server.js (server forwards to Google). Or your Apps Script Web App URL.
 var LOG_TO_SHEET_URL = "https://shadow-learning-production.up.railway.app/log-key";
 
-// When the site is not on the same server as KEY_SERVER_URL (e.g. GitHub Pages), use that server's /api/verify so key check works (avoids CORS).
-if (typeof VALIDATE_LICENSE_URL === "undefined" && typeof location !== "undefined" && KEY_SERVER_URL && KEY_SERVER_URL.indexOf("http") === 0) {
-  var _base = KEY_SERVER_URL.match(/^(https?:\/\/[^/]+)/);
-  if (_base && location.origin !== _base[1]) var VALIDATE_LICENSE_URL = _base[1] + "/api/verify";
-}
-
 function getDeviceFingerprint() {
   try {
     var n = typeof navigator !== "undefined" ? navigator : {};
@@ -118,7 +112,7 @@ var SHADOW_LOADING_MS = 1800;
   if (!form || !input) return;
 
   var validateUrl = (typeof VALIDATE_LICENSE_URL === "string" && VALIDATE_LICENSE_URL.trim()) ? VALIDATE_LICENSE_URL.trim() : (location.origin + "/api/validate-license");
-  var useServerProxy = (typeof VALIDATE_LICENSE_URL === "string" && VALIDATE_LICENSE_URL.trim().length > 0);
+  var useServerProxy = false;
 
   function onValid(key) {
     setUnlocked(hashKey(key));
