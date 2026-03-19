@@ -159,10 +159,45 @@ var SHADOW_LOADING_MS = 1800;
     }
   }
 
+  // Escape % and _ so ILIKE is exact match (case-insensitive)
+  function escapeForIlike(s) {
+    return String(s).replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+  }
+
+  /**
+   * @returns {Promise<{ invited: boolean, error: object | null }>}
+   * Uses limit(1) — not .single() — so "no row" is not confused with RLS / network errors.
+   */
   function isInvitedEmail(email) {
-    return sb.from(INVITES_TABLE).select("email").eq("email", email).single().then(function (res) {
-      return !res.error && !!res.data;
-    });
+    var normalized = normalizeEmail(email);
+    return sb
+      .from(INVITES_TABLE)
+      .select("email")
+      .eq("email", normalized)
+      .limit(1)
+      .then(function (res) {
+        if (res.error) return { invited: false, error: res.error };
+        if (res.data && res.data.length > 0) return { invited: true, error: null };
+        var pat = escapeForIlike(normalized);
+        return sb
+          .from(INVITES_TABLE)
+          .select("email")
+          .ilike("email", pat)
+          .limit(1)
+          .then(function (res2) {
+            if (res2.error) return { invited: false, error: res2.error };
+            if (res2.data && res2.data.length > 0) return { invited: true, error: null };
+            return { invited: false, error: null };
+          });
+      });
+  }
+
+  function inviteCheckMessage(err) {
+    var msg = (err && (err.message || err.details || String(err))) || "Unknown error";
+    if (/permission denied|rls|row-level security|policy/i.test(msg) || (err && err.code === "42501")) {
+      return "The invite list couldn’t be read (database security / RLS). In Supabase: Table Editor → " + INVITES_TABLE + " → RLS → add a policy allowing SELECT for anon on that table (or use a SECURITY DEFINER RPC).";
+    }
+    return "Could not verify invite: " + msg;
   }
 
   function verifySessionAndUnlock(session) {
@@ -171,8 +206,16 @@ var SHADOW_LOADING_MS = 1800;
     if (!email) {
       return sb.auth.signOut();
     }
-    return isInvitedEmail(email).then(function (ok) {
-      if (ok) onValid(email);
+    return isInvitedEmail(email).then(function (result) {
+      if (result.error) {
+        try {
+          console.warn("Invite check failed:", result.error);
+        } catch (e) {}
+        return sb.auth.signOut().then(function () {
+          onInvalid(inviteCheckMessage(result.error));
+        });
+      }
+      if (result.invited) onValid(email);
       else {
         return sb.auth.signOut().then(function () {
           onInvalid("This account isn’t on the invite list.");
@@ -221,9 +264,16 @@ var SHADOW_LOADING_MS = 1800;
     }
 
     isInvitedEmail(email)
-      .then(function (invited) {
-        if (!invited) {
-          onInvalid("This email isn’t on the invite list.");
+      .then(function (result) {
+        if (result.error) {
+          try {
+            console.warn("Invite check failed:", result.error);
+          } catch (e) {}
+          onInvalid(inviteCheckMessage(result.error));
+          return;
+        }
+        if (!result.invited) {
+          onInvalid("This email isn’t on the invite list. Try the same spelling you used in the invite table (we also match capitals).");
           return;
         }
         return sb.auth.signInWithOtp({
@@ -237,7 +287,10 @@ var SHADOW_LOADING_MS = 1800;
           onSent();
         });
       })
-      .catch(function () {
+      .catch(function (err) {
+        try {
+          console.warn("Invite check threw:", err);
+        } catch (e) {}
         onInvalid("Could not reach the server. Try again.");
       })
       .then(done);
