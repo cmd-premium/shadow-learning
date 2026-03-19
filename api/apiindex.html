@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Login</title>
+</head>
+<body>
+
+<h2>Invite Only Login</h2>
+
+<input id="email" placeholder="Enter your email">
+<button onclick="login()">Request Access</button>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+const supabase = supabase.createClient(
+  "https://cejmnisauqjamivnynes.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNlam1uaXNhdXFqYW1pdm55bmVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4ODUyMjYsImV4cCI6MjA4OTQ2MTIyNn0.7kir_odjqtZtZymdrJAtZtHb2dqhEMUxRcu8HJiGAeY"
+);
+
+async function login() {
+  const email = document.getElementById("email").value.trim().toLowerCase();
+
+  if (!email) {
+    alert("Enter email");
+    return;
+  }
+
+  // 🔍 Check if invited
+  const { data, error } = await supabase
+    .from("invites")
+    .select("email")
+    .eq("email", email)
+    .single();
+
+  if (error || !data) {
+    alert("You are not invited.");
+    return;
+  }
+
+  // ✉️ Send magic link
+  const { error: loginError } = await supabase.auth.signInWithOtp({
+    email: email
+  });
+
+  if (loginError) {
+    alert(loginError.message);
+  } else {
+    alert("Check your email for the login link!");
+  }
+}
+</script>
+
+</body>
+</html>
+
+<script>
+    supabase.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        window.location = "apigamesection.html";
+      }
+    });
+    </script>

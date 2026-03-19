@@ -208,6 +208,10 @@ body.key-gate-visible .main-app {
   font-weight: 500;
 }
 
+.key-error.key-success {
+  color: #34d399;
+}
+
 /* Home screen card */
 .home-screen-card {
   position: relative;

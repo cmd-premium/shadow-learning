@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Dashboard</title>
+</head>
+<body>
+
+<h2>Welcome to the Dashboard</h2>
+<button onclick="logout()">Logout</button>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+const supabase = supabase.createClient(
+  "https://cejmnisauqjamivnynes.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNlam1uaXNhdXFqYW1pdm55bmVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4ODUyMjYsImV4cCI6MjA4OTQ2MTIyNn0.7kir_odjqtZtZymdrJAtZtHb2dqhEMUxRcu8HJiGAeY"
+);
+
+async function checkUser() {
+  const { data } = await supabase.auth.getUser();
+
+  if (!data.user) {
+    window.location = "index.html";
+    return;
+  }
+
+  // 🔒 Check invite again
+  const { data: invite } = await supabase
+    .from("invites")
+    .select("email")
+    .eq("email", data.user.email)
+    .single();
+
+  if (!invite) {
+    alert("Access denied");
+    await supabase.auth.signOut();
+    window.location = "index.html";
+  }
+}
+
+async function logout() {
+  await supabase.auth.signOut();
+  window.location = "index.html";
+}
+
+checkUser();
+</script>
+
+</body>
+</html>

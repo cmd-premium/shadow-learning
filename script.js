@@ -1,5 +1,4 @@
-// ——— Access key: valid keys are stored as hashes so the real key isn't in source.
-// To add a key "mykey", run in browser console: hashKey("mykey") then add that to ACCESS_KEY_HASHES.
+// ——— Helpers: hash for sl_key_hash (staff) — no plaintext stored.
 function normalizeKey(s) {
   var str = String(s).trim().replace(/\s+/g, "");
   str = str.replace(/\uFF10/g, "0").replace(/\uFF11/g, "1").replace(/\uFF12/g, "2")
@@ -15,16 +14,14 @@ function hashKey(s) {
   }
   return (h >>> 0).toString(36);
 }
-var ACCESS_KEY_HASHES = ["15a0", "16qo", "14ik", "11ki", "131u"];  // hashKey("624"), hashKey("819"), hashKey("518"), hashKey("123"), hashKey("321")
+function normalizeEmail(s) {
+  return String(s || "").trim().toLowerCase();
+}
 
-// Optional: set to your API URL to bind each key to one device (stops "share my code").
-// Leave empty "" for keys that can be used on any device.
-// Use "/check-key" when you run server.js (same server). Or set a full URL if key API is elsewhere.
-var KEY_SERVER_URL = "https://shadow-learning-production.up.railway.app/check-key";
-
-// Optional: log each unlock to a Google Sheet (device + key). See google-sheet-log/ folder.
-// Use "/log-key" when running server.js (server forwards to Google). Or your Apps Script Web App URL.
-var LOG_TO_SHEET_URL = "https://shadow-learning-production.up.railway.app/log-key";
+// Supabase (invite list + magic link). Add this Site URL + redirect in Supabase Auth settings.
+var SUPABASE_URL = "https://cejmnisauqjamivnynes.supabase.co";
+var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNlam1uaXNhdXFqYW1pdm55bmVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4ODUyMjYsImV4cCI6MjA4OTQ2MTIyNn0.7kir_odjqtZtZymdrJAtZtHb2dqhEMUxRcu8HJiGAeY";
+var INVITES_TABLE = "invites";
 
 function getDeviceFingerprint() {
   try {
@@ -103,19 +100,34 @@ var SHADOW_LOADING_MS = 1800;
   }, SHADOW_LOADING_MS);
 })();
 
-// Key gate: uses codes.js (LicenseGate verify) when loaded, else POST to /api/validate-license
-(function keyGate() {
+// Invite gate: Supabase `invites` table + email OTP (magic link)
+(function inviteEmailGate() {
   var form = document.getElementById("key-form");
   var input = document.getElementById("key-input");
   var errorEl = document.getElementById("key-error");
   var submitBtn = form ? form.querySelector(".key-submit") : null;
   if (!form || !input) return;
 
-  var validateUrl = (typeof VALIDATE_LICENSE_URL === "string" && VALIDATE_LICENSE_URL.trim()) ? VALIDATE_LICENSE_URL.trim() : (location.origin + "/api/validate-license");
-  var useServerProxy = false;
+  var sb = null;
+  try {
+    var NS = typeof window !== "undefined" && window.supabase;
+    if (NS && typeof NS.createClient === "function") {
+      sb = NS.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    }
+  } catch (e) {}
+  if (!sb) {
+    if (errorEl) {
+      errorEl.textContent = "Sign-in isn’t available (missing Supabase). Check script order.";
+      errorEl.hidden = false;
+    }
+    return;
+  }
 
-  function onValid(key) {
-    setUnlocked(hashKey(key));
+  var emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  var redirectTo = location.origin + location.pathname + location.search;
+
+  function onValid(email) {
+    setUnlocked(hashKey(normalizeEmail(email)));
     document.body.classList.remove("key-gate-visible");
     document.body.classList.add("home-visible");
     if (typeof updateStaffVisibility === "function") updateStaffVisibility();
@@ -124,91 +136,121 @@ var SHADOW_LOADING_MS = 1800;
   function onInvalid(message) {
     input.classList.add("error");
     if (errorEl) {
-      errorEl.textContent = message || "Invalid key.";
+      errorEl.classList.remove("key-success");
+      errorEl.textContent = message || "Something went wrong.";
       errorEl.hidden = false;
     }
     input.focus();
   }
 
-  function done() {
-    if (submitBtn) {
-      submitBtn.disabled = false;
-      submitBtn.textContent = "Unlock";
+  function onSent() {
+    input.classList.remove("error");
+    if (errorEl) {
+      errorEl.classList.add("key-success");
+      errorEl.textContent = "Check your email for the sign-in link, then open it on this device.";
+      errorEl.hidden = false;
     }
   }
 
+  function done() {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Send sign-in link";
+    }
+  }
+
+  function isInvitedEmail(email) {
+    return sb.from(INVITES_TABLE).select("email").eq("email", email).single().then(function (res) {
+      return !res.error && !!res.data;
+    });
+  }
+
+  function verifySessionAndUnlock(session) {
+    if (!session || !session.user) return Promise.resolve();
+    var email = normalizeEmail(session.user.email || "");
+    if (!email) {
+      return sb.auth.signOut();
+    }
+    return isInvitedEmail(email).then(function (ok) {
+      if (ok) onValid(email);
+      else {
+        return sb.auth.signOut().then(function () {
+          onInvalid("This account isn’t on the invite list.");
+        });
+      }
+    });
+  }
+
+  sb.auth.onAuthStateChange(function (event, session) {
+    if (session) verifySessionAndUnlock(session);
+  });
+
+  sb.auth.getSession().then(function (res) {
+    var session = res.data && res.data.session;
+    if (session) verifySessionAndUnlock(session);
+  });
+
+  // afterLoad clears sl_unlocked — run again once loading UI has finished
+  window._shadowInviteSessionCheck = function () {
+    sb.auth.getSession().then(function (res) {
+      var session = res.data && res.data.session;
+      if (session) verifySessionAndUnlock(session);
+    });
+  };
+
   form.addEventListener("submit", function (e) {
     e.preventDefault();
-    var key = normalizeKey(input.value || "");
+    var email = normalizeEmail(input.value || "");
     input.classList.remove("error");
     if (errorEl) {
       errorEl.hidden = true;
       errorEl.textContent = "";
+      errorEl.classList.remove("key-success");
     }
-    if (!key) {
-      onInvalid("Enter a key.");
+    if (!email) {
+      onInvalid("Enter your email.");
+      return;
+    }
+    if (!emailOk.test(email)) {
+      onInvalid("Enter a valid email address.");
       return;
     }
     if (submitBtn) {
       submitBtn.disabled = true;
-      submitBtn.textContent = "Checking...";
+      submitBtn.textContent = "Sending…";
     }
 
-    if (useServerProxy) {
-      var verifyUrl = (validateUrl.indexOf("?") >= 0 ? validateUrl + "&" : validateUrl + "?") + "code=" + encodeURIComponent(key);
-      fetch(verifyUrl, { method: "GET", mode: "cors" })
-        .then(function (r) {
-          var ct = r.headers.get("Content-Type") || "";
-          if (!r.ok) return r.text().then(function () { return { valid: false }; });
-          if (ct.indexOf("application/json") >= 0) return r.json();
-          return r.text().then(function () { return { valid: false }; });
-        })
-        .then(function (data) {
-          if (data && data.valid === true) onValid(key);
-          else onInvalid((data && data.message) || (data && data.error) || "Invalid key.");
-        })
-        .catch(function (err) {
-          onInvalid("Could not verify key. Try again or check your connection.");
-        })
-        .then(done);
-      return;
-    }
-
-    if (typeof window.SHADOW_CHECK_CODE === "function") {
-      var deviceId = getDeviceFingerprint() || "unknown";
-      window.SHADOW_CHECK_CODE(key, deviceId)
-        .then(function (valid) {
-          if (valid) onValid(key); else onInvalid("Invalid key.");
-        })
-        .catch(function () { onInvalid("Could not verify key. Try again or check your connection."); })
-        .then(done);
-      return;
-    }
-
-    var device = getDeviceFingerprint() || "unknown";
-    fetch(validateUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key: key, device: device })
-    })
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        var valid = data && (data.valid === true || data.result === "VALID" || data.ok === true);
-        if (valid) onValid(key);
-        else onInvalid((data && (data.error || data.message)) || "Invalid key.");
+    isInvitedEmail(email)
+      .then(function (invited) {
+        if (!invited) {
+          onInvalid("This email isn’t on the invite list.");
+          return;
+        }
+        return sb.auth.signInWithOtp({
+          email: email,
+          options: { emailRedirectTo: redirectTo }
+        }).then(function (res) {
+          if (res.error) {
+            onInvalid(res.error.message || "Could not send email.");
+            return;
+          }
+          onSent();
+        });
       })
-      .catch(function () { onInvalid("Could not verify key. Try again or check your connection."); })
+      .catch(function () {
+        onInvalid("Could not reach the server. Try again.");
+      })
       .then(done);
   });
 })();
 
-// Staff key hashes: 518 = 14ik, 624 = 15a0 (only these see Staff section)
-var STAFF_KEY_HASHES = ["14ik", "15a0"];
+// Staff: add hashes of staff emails — in console: hashKey(normalizeEmail("you@domain.com"))
+var STAFF_EMAIL_HASHES = [];
 
 function isStaffKey() {
   try {
     var h = localStorage.getItem("sl_key_hash");
-    return h && STAFF_KEY_HASHES.indexOf(h) !== -1;
+    return h && STAFF_EMAIL_HASHES.indexOf(h) !== -1;
   } catch (e) { return false; }
 }
 
@@ -531,7 +573,10 @@ function populateGameLists() {
   }, filterGamesBySearch);
 }
 
-window._shadowLearningOnReady = populateGameLists;
+window._shadowLearningOnReady = function () {
+  if (typeof window._shadowInviteSessionCheck === "function") window._shadowInviteSessionCheck();
+  populateGameLists();
+};
 
 function filterGamesBySearch() {
   var searchEl = document.getElementById("game-search");

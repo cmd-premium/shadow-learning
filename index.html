@@ -48,14 +48,14 @@
       <div class="loading-burst" id="loading-burst"></div>
     </div>
 
-    <section id="key-gate" class="key-gate" aria-label="Enter access key" aria-live="polite">
+    <section id="key-gate" class="key-gate" aria-label="Sign in with email" aria-live="polite">
       <div class="key-gate-card">
         <p class="key-gate-badge">Premium</p>
         <h2 class="key-gate-title">Shadow Learning</h2>
-        <p class="key-gate-desc">Enter your access key to continue.</p>
+        <p class="key-gate-desc">Invite only. Enter the email on your invite—we’ll send a one-time sign-in link.</p>
         <form id="key-form" class="key-form" novalidate>
-          <input type="text" id="key-input" class="key-input" placeholder="Access key" autocomplete="off" aria-label="Access key" />
-          <button type="submit" class="key-submit">Unlock</button>
+          <input type="email" id="key-input" class="key-input" placeholder="you@example.com" autocomplete="email" inputmode="email" aria-label="Email address" />
+          <button type="submit" class="key-submit">Send sign-in link</button>
         </form>
         <p id="key-error" class="key-error" role="alert" hidden></p>
       </div>
@@ -210,7 +210,7 @@
     </div>
 
     <script src="ugs-games-list.js"></script>
-    <script src="codes.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="script.js"></script>
   </body>
 </html>
