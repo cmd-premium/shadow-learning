@@ -656,17 +656,46 @@ if (taglineWordEl) {
   var CLOAK_TITLE = "Home - Classroom";
   var CLOAK_FAVICON = "https://media.discordapp.net/attachments/1133385262903328821/1481443467447111791/image-removebg-preview_6.png?ex=69bb3e3e&is=69b9ecbe&hm=0eeb1c9ba625353f447f0b26ac5108c7ace21d98387792bc5278e72a0c1a67cb&=&format=webp&quality=lossless&width=1250&height=1250";
   var originalTitle = document.title;
-  var linkIcon = document.querySelector('link[rel="icon"]') || document.querySelector('link[rel="shortcut icon"]');
-  var originalFavicon = linkIcon ? linkIcon.getAttribute("href") : "";
+  var originalFavicon = (function () {
+    var link =
+      document.querySelector('link[rel="icon"]') ||
+      document.querySelector('link[rel="shortcut icon"]');
+    return link ? link.getAttribute("href") : "";
+  })();
+
+  function cacheBust(href) {
+    if (!href) return href;
+    // Don't break data URLs by appending query params.
+    if (href.indexOf("data:") === 0) return href;
+    var sep = href.indexOf("?") >= 0 ? "&" : "?";
+    return href + sep + "t=" + Date.now();
+  }
+
+  function setFaviconHref(href, bust) {
+    if (!href) return;
+    var links = document.head.querySelectorAll('link[rel="icon"], link[rel="shortcut icon"]');
+    if (!links.length) {
+      var l = document.createElement("link");
+      l.rel = "icon";
+      document.head.appendChild(l);
+      links = [l];
+    }
+    var targetHref = bust ? cacheBust(href) : href;
+    links.forEach(function (link) {
+      // Ensure attribute exists.
+      if (!link.getAttribute("type")) link.setAttribute("type", "image/png");
+      link.setAttribute("href", targetHref);
+    });
+  }
 
   function applyCloak() {
     document.title = CLOAK_TITLE;
-    if (linkIcon) linkIcon.setAttribute("href", CLOAK_FAVICON);
+    setFaviconHref(CLOAK_FAVICON, true);
   }
 
   function removeCloak() {
     document.title = originalTitle;
-    if (linkIcon && originalFavicon) linkIcon.setAttribute("href", originalFavicon);
+    if (originalFavicon) setFaviconHref(originalFavicon, false);
   }
 
   document.addEventListener("visibilitychange", function () {
