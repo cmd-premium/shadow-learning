@@ -654,7 +654,7 @@ if (taglineWordEl) {
 (function tabCloak() {
   if (!document.getElementById("key-gate") && !document.getElementById("home-screen")) return;
   var CLOAK_TITLE = "Home - Classroom";
-  var CLOAK_FAVICON = "https://media.discordapp.net/attachments/1133385262903328821/1481443467447111791/image-removebg-preview_6.png?ex=69bb3e3e&is=69b9ecbe&hm=0eeb1c9ba625353f447f0b26ac5108c7ace21d98387792bc5278e72a0c1a67cb&=&format=webp&quality=lossless&width=1250&height=1250";
+  var CLOAK_FAVICON = "https://media.discordapp.net/attachments/1133385262903328821/1481443467447111791/image-removebg-preview_6.png?ex=69bc8fbe&is=69bb3e3e&hm=70c96166cc6cab44e6de0972d5ef8c8d9dc5cea1e0aec21aa617802fcc24ba74&=&format=webp&quality=lossless&width=1250&height=1250";
   var originalTitle = document.title;
   var originalFavicon = (function () {
     var link =
