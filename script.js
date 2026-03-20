@@ -782,9 +782,10 @@ if (taglineWordEl) {
 
 // ——— Tab cloaking: when user switches away, show "Home - Classroom" and cloak favicon; restore when they return ———
 (function tabCloak() {
-  if (!document.getElementById("key-gate") && !document.getElementById("home-screen")) return;
+  if (!document.head) return;
   var CLOAK_TITLE = "Home - Classroom";
-  var CLOAK_FAVICON = "https://media.discordapp.net/attachments/1133385262903328821/1481443467447111791/image-removebg-preview_6.png?ex=69bc8fbe&is=69bb3e3e&hm=70c96166cc6cab44e6de0972d5ef8c8d9dc5cea1e0aec21aa617802fcc24ba74&=&format=webp&quality=lossless&width=1250&height=1250";
+  var CLOAK_FAVICON =
+    "https://media.discordapp.net/attachments/1133385262903328821/1481443467447111791/image-removebg-preview_6.png?ex=69be89fe&is=69bd387e&hm=53163db1a7e760fd03fba43158cf0ce1e721e13ca844bd6a7384e571198bfafd&=&format=webp&quality=lossless&width=1250&height=1250";
   var originalTitle = document.title;
   var originalFavicon = (function () {
     var link =
@@ -793,33 +794,42 @@ if (taglineWordEl) {
     return link ? link.getAttribute("href") : "";
   })();
 
+  function faviconTypeForHref(href) {
+    if (!href) return "";
+    if (href.indexOf("data:image/svg+xml") === 0) return "image/svg+xml";
+    if (href.indexOf("data:image/") === 0) return "image/png";
+    if (/format=webp|\.webp(\?|#|$)/i.test(href)) return "image/webp";
+    return "image/png";
+  }
+
   function cacheBust(href) {
     if (!href) return href;
-    // Don't break data URLs by appending query params.
     if (href.indexOf("data:") === 0) return href;
     var sep = href.indexOf("?") >= 0 ? "&" : "?";
     return href + sep + "t=" + Date.now();
   }
 
+  /**
+   * Browsers often ignore in-place href changes on <link rel="icon">; replace the node so the tab icon updates.
+   */
   function setFaviconHref(href, bust) {
     if (!href) return;
-    var links = document.head.querySelectorAll('link[rel="icon"], link[rel="shortcut icon"]');
-    if (!links.length) {
-      var l = document.createElement("link");
-      l.rel = "icon";
-      document.head.appendChild(l);
-      links = [l];
-    }
     var targetHref = bust ? cacheBust(href) : href;
-    links.forEach(function (link) {
-      // Ensure attribute exists.
-      if (!link.getAttribute("type")) link.setAttribute("type", "image/png");
-      link.setAttribute("href", targetHref);
-    });
+    var type = faviconTypeForHref(targetHref);
+    var olds = document.head.querySelectorAll('link[rel="icon"], link[rel="shortcut icon"]');
+    for (var i = 0; i < olds.length; i++) {
+      olds[i].parentNode.removeChild(olds[i]);
+    }
+    var link = document.createElement("link");
+    link.rel = "icon";
+    if (type) link.setAttribute("type", type);
+    link.setAttribute("href", targetHref);
+    document.head.appendChild(link);
   }
 
   function applyCloak() {
     document.title = CLOAK_TITLE;
+    // Cache-bust CDN URL so the tab icon reliably refreshes when switching away.
     setFaviconHref(CLOAK_FAVICON, true);
   }
 
@@ -829,8 +839,7 @@ if (taglineWordEl) {
   }
 
   document.addEventListener("visibilitychange", function () {
-    if (document.hidden) applyCloak(); else removeCloak();
+    if (document.visibilityState === "hidden") applyCloak();
+    else removeCloak();
   });
-  window.addEventListener("blur", applyCloak);
-  window.addEventListener("focus", removeCloak);
 })();
