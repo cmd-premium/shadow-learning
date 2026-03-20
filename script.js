@@ -23,6 +23,15 @@ var SUPABASE_URL = "https://cejmnisauqjamivnynes.supabase.co";
 var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNlam1uaXNhdXFqYW1pdm55bmVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4ODUyMjYsImV4cCI6MjA4OTQ2MTIyNn0.7kir_odjqtZtZymdrJAtZtHb2dqhEMUxRcu8HJiGAeY";
 var INVITES_TABLE = "invites";
 
+function getRedirectGateHashes() {
+  try {
+    var a = typeof window !== "undefined" ? window.REDIRECT_GATE_CODE_HASHES : null;
+    return Array.isArray(a) ? a : [];
+  } catch (e) {
+    return [];
+  }
+}
+
 function getDeviceFingerprint() {
   try {
     var n = typeof navigator !== "undefined" ? navigator : {};
@@ -78,7 +87,30 @@ var SHADOW_LOADING_MS = 1800;
       localStorage.removeItem("sl_fp");
       localStorage.removeItem("sl_key_hash");
     } catch (e) {}
-    if (isUnlocked()) {
+
+    var directTicket = null;
+    try {
+      if (sessionStorage.getItem("sl_direct_play") === "1") {
+        var t = sessionStorage.getItem("sl_direct_ticket");
+        var allowed = getRedirectGateHashes();
+        if (t && allowed.indexOf(t) !== -1) {
+          directTicket = t;
+          sessionStorage.removeItem("sl_direct_play");
+          sessionStorage.removeItem("sl_direct_ticket");
+        } else {
+          sessionStorage.removeItem("sl_direct_play");
+          sessionStorage.removeItem("sl_direct_ticket");
+        }
+      }
+    } catch (e) {}
+
+    if (directTicket) {
+      setUnlocked(directTicket);
+      document.body.classList.remove("key-gate-visible");
+      document.body.classList.remove("home-visible");
+      document.body.classList.add("app-visible");
+      if (typeof updateStaffVisibility === "function") updateStaffVisibility();
+    } else if (isUnlocked()) {
       document.body.classList.add("home-visible");
     } else {
       document.body.classList.add("key-gate-visible");

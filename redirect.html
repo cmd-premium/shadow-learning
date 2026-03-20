@@ -3,25 +3,92 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Redirecting...</title>
+    <title>Game link</title>
+    <script src="redirect-gate-codes.js"></script>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        font-family: system-ui, sans-serif;
+        background: #050810;
+        color: #94a3b8;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        margin: 0;
+        padding: 24px;
+        text-align: center;
+      }
+      .card {
+        max-width: 420px;
+        padding: 28px 24px;
+        background: rgba(8, 12, 18, 0.85);
+        border: 1px solid rgba(148, 163, 184, 0.12);
+        border-radius: 16px;
+      }
+      h1 {
+        font-size: 1.1rem;
+        color: #e2e8f0;
+        margin: 0 0 12px 0;
+      }
+      p { margin: 0 0 16px 0; line-height: 1.5; font-size: 14px; }
+      a { color: #22d3ee; font-weight: 600; }
+      code { font-size: 12px; color: #cbd5e1; }
+    </style>
   </head>
   <body>
+    <div class="card" id="msg">
+      <noscript>
+        <h1>JavaScript required</h1>
+        <p><a href="./index.html">Open the main site</a></p>
+      </noscript>
+    </div>
     <script>
-      // Skip key gate: mark the user unlocked then go to the main game page.
-      try {
-        localStorage.setItem("sl_unlocked", "1");
-      } catch (e) {}
+      function normalizeKey(s) {
+        var str = String(s).trim().replace(/\s+/g, "");
+        str = str.replace(/\uFF10/g, "0").replace(/\uFF11/g, "1").replace(/\uFF12/g, "2")
+          .replace(/\uFF13/g, "3").replace(/\uFF14/g, "4").replace(/\uFF15/g, "5")
+          .replace(/\uFF16/g, "6").replace(/\uFF17/g, "7").replace(/\uFF18/g, "8").replace(/\uFF19/g, "9");
+        return str;
+      }
+      function hashKey(s) {
+        var h = 0;
+        var str = normalizeKey(s);
+        for (var i = 0; i < str.length; i++) {
+          h = ((h << 5) - h) + str.charCodeAt(i) | 0;
+        }
+        return (h >>> 0).toString(36);
+      }
 
-      // Redirect to the game UI.
-      try {
-        location.replace("./index.html");
-      } catch (e) {
-        location.href = "index.html";
+      var el = document.getElementById("msg");
+      var params = new URLSearchParams(location.search);
+      var code = params.get("code") || params.get("c");
+      var allowed = Array.isArray(window.REDIRECT_GATE_CODE_HASHES) ? window.REDIRECT_GATE_CODE_HASHES : [];
+
+      function fail(title, text) {
+        el.innerHTML =
+          "<h1>" + title + "</h1>" +
+          "<p>" + text + "</p>" +
+          '<p><a href="./index.html">Sign in with email on the main site</a></p>' +
+          "<p><code>redirect.html?code=YOUR_CODE</code></p>";
+      }
+
+      if (!code || !String(code).trim()) {
+        fail("Code required", "This link only works with a code in the URL.");
+      } else if (!allowed.length) {
+        fail("Not configured", "No valid codes are set up yet. Add hashes to <strong>redirect-gate-codes.js</strong>.");
+      } else {
+        var h = hashKey(normalizeKey(code));
+        if (allowed.indexOf(h) === -1) {
+          fail("Invalid code", "That code doesn’t match an approved game link.");
+        } else {
+          try {
+            sessionStorage.setItem("sl_direct_play", "1");
+            sessionStorage.setItem("sl_direct_ticket", h);
+          } catch (e) {}
+          location.replace("./index.html");
+        }
       }
     </script>
-    <noscript>
-      <meta http-equiv="refresh" content="0; url=./index.html" />
-    </noscript>
   </body>
 </html>
-
