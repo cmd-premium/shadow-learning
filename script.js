@@ -781,16 +781,14 @@ if (taglineWordEl) {
 }
 
 // ——— Tab cloaking: when user switches away, show "Home - Classroom" and cloak favicon; restore when they return ———
+// Cloak icon is same-origin `cloak-favicon.svg` (works on GitHub Pages; replace file with your own PNG/SVG if you want).
 (function tabCloak() {
   if (!document.head) return;
   var CLOAK_TITLE = "Home - Classroom";
-  // Direct Discord URL (signed) — do NOT cache-bust; extra query params break the signature.
-  var CLOAK_FAVICON_REMOTE =
-    "https://media.discordapp.net/attachments/1133385262903328821/1481443467447111791/image-removebg-preview_6.png?ex=69be89fe&is=69bd387e&hm=53163db1a7e760fd03fba43158cf0ce1e721e13ca844bd6a7384e571198bfafd&=&format=webp&quality=lossless&width=1250&height=1250";
-  var CLOAK_FAVICON_FALLBACK =
+  var CLOAK_FAVICON_INLINE =
     "data:image/svg+xml," +
     encodeURIComponent(
-      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#1a73e8"/><path fill="#fff" d="M8 12h16v2H8zm0 5h12v2H8zm0 5h14v2H8z"/></svg>'
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#1a73e8"/><path fill="#fff" fill-opacity=".95" d="M8 10h16v2H8zm0 5h14v2H8zm0 5h16v2H8zm0 5h10v2H8z"/></svg>'
     );
   var originalTitle = document.title;
   var originalFavicon = (function () {
@@ -800,20 +798,25 @@ if (taglineWordEl) {
     return link ? link.getAttribute("href") : "";
   })();
 
-  function sameOriginCloakProxyHref() {
-    if (location.protocol !== "http:" && location.protocol !== "https:") return "";
-    try {
-      return new URL("cloak-favicon", document.baseURI || location.href).href;
-    } catch (e) {
-      return "";
+  function getCloakFaviconHref() {
+    if (location.protocol === "http:" || location.protocol === "https:") {
+      try {
+        return new URL("cloak-favicon.svg", document.baseURI || location.href).href;
+      } catch (e) {}
     }
+    return CLOAK_FAVICON_INLINE;
   }
 
   function faviconTypeForHref(href) {
     if (!href) return "";
     if (href.indexOf("data:image/svg+xml") === 0) return "image/svg+xml";
     if (href.indexOf("data:image/") === 0) return "image/png";
-    if (/format=webp|\.webp(\?|#|$)/i.test(href)) return "image/webp";
+    try {
+      var pathOnly = new URL(href, location.href).pathname || "";
+      if (/\.svg$/i.test(pathOnly)) return "image/svg+xml";
+      if (/\.png$/i.test(pathOnly)) return "image/png";
+      if (/\.webp$/i.test(pathOnly)) return "image/webp";
+    } catch (e) {}
     return "";
   }
 
@@ -838,47 +841,14 @@ if (taglineWordEl) {
     var link = document.createElement("link");
     link.rel = "icon";
     if (type) link.setAttribute("type", type);
-    if (/^https?:\/\//i.test(targetHref)) {
-      try {
-        link.referrerPolicy = "no-referrer";
-      } catch (e) {}
-    }
+    if (type === "image/svg+xml") link.setAttribute("sizes", "any");
     link.setAttribute("href", targetHref);
     document.head.appendChild(link);
   }
 
   function applyCloak() {
     document.title = CLOAK_TITLE;
-    var proxy = sameOriginCloakProxyHref();
-    if (proxy) {
-      var probe = new Image();
-      probe.referrerPolicy = "no-referrer";
-      probe.onload = function () {
-        setFaviconHref(proxy, true);
-      };
-      probe.onerror = function () {
-        var probe2 = new Image();
-        probe2.referrerPolicy = "no-referrer";
-        probe2.onload = function () {
-          setFaviconHref(CLOAK_FAVICON_REMOTE, false);
-        };
-        probe2.onerror = function () {
-          setFaviconHref(CLOAK_FAVICON_FALLBACK, false);
-        };
-        probe2.src = CLOAK_FAVICON_REMOTE;
-      };
-      probe.src = cacheBust(proxy);
-      return;
-    }
-    var probe3 = new Image();
-    probe3.referrerPolicy = "no-referrer";
-    probe3.onload = function () {
-      setFaviconHref(CLOAK_FAVICON_REMOTE, false);
-    };
-    probe3.onerror = function () {
-      setFaviconHref(CLOAK_FAVICON_FALLBACK, false);
-    };
-    probe3.src = CLOAK_FAVICON_REMOTE;
+    setFaviconHref(getCloakFaviconHref(), true);
   }
 
   function removeCloak() {
