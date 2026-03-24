@@ -146,6 +146,28 @@ body.key-gate-visible .main-app {
   margin: 0 0 24px 0;
   font-size: 14px;
   color: var(--muted);
+  line-height: 1.55;
+  text-align: left;
+}
+
+.key-gate-desc p {
+  margin: 0 0 12px 0;
+}
+
+.key-gate-desc p:last-child {
+  margin-bottom: 0;
+}
+
+.key-gate-desc a {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: break-all;
+}
+
+.key-gate-desc a:hover {
+  color: var(--accent-2);
 }
 
 .key-form {
@@ -180,25 +202,6 @@ body.key-gate-visible .main-app {
 .key-input.error {
   border-color: rgba(239, 68, 68, 0.6);
   box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
-}
-
-.key-submit {
-  padding: 16px 24px;
-  font-family: var(--font);
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--bg);
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease);
-}
-
-.key-submit:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 0 32px rgba(34, 211, 238, 0.4);
 }
 
 .key-error {

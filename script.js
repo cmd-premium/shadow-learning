@@ -137,7 +137,6 @@ var SHADOW_LOADING_MS = 1800;
   var form = document.getElementById("key-form");
   var input = document.getElementById("key-input");
   var errorEl = document.getElementById("key-error");
-  var submitBtn = form ? form.querySelector(".key-submit") : null;
   if (!form || !input) return;
 
   var sb = null;
@@ -182,30 +181,29 @@ var SHADOW_LOADING_MS = 1800;
   }
 
   function onInvalid(message) {
-    input.classList.add("error");
+    if (!input.disabled) input.classList.add("error");
     if (errorEl) {
       errorEl.classList.remove("key-success");
       errorEl.textContent = message || "Something went wrong.";
       errorEl.hidden = false;
     }
-    input.focus();
+    if (!input.disabled) {
+      try {
+        input.focus();
+      } catch (e) {}
+    }
   }
 
   function onSent() {
     input.classList.remove("error");
     if (errorEl) {
       errorEl.classList.add("key-success");
-      errorEl.textContent = "Check your email for the sign-in link, then open it on this device.";
+      errorEl.textContent = "Check your email for the magic-link message and open the link inside it on this device.";
       errorEl.hidden = false;
     }
   }
 
-  function done() {
-    if (submitBtn) {
-      submitBtn.disabled = false;
-      submitBtn.textContent = "Send sign-in link";
-    }
-  }
+  function done() {}
 
   // Escape % and _ so ILIKE is exact match (case-insensitive)
   function escapeForIlike(s) {
@@ -291,6 +289,7 @@ var SHADOW_LOADING_MS = 1800;
 
   form.addEventListener("submit", function (e) {
     e.preventDefault();
+    if (input.disabled) return;
     var email = normalizeEmail(input.value || "");
     input.classList.remove("error");
     if (errorEl) {
@@ -306,11 +305,6 @@ var SHADOW_LOADING_MS = 1800;
       onInvalid("Enter a valid email address.");
       return;
     }
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.textContent = "Sending…";
-    }
-
     isInvitedEmail(email)
       .then(function (result) {
         if (result.error) {

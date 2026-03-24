@@ -63,14 +63,18 @@
       <div class="loading-burst" id="loading-burst"></div>
     </div>
 
-    <section id="key-gate" class="key-gate" aria-label="Sign in with email" aria-live="polite">
+    <section id="key-gate" class="key-gate" aria-label="Invite-only access" aria-live="polite">
       <div class="key-gate-card">
         <p class="key-gate-badge">Premium</p>
         <h2 class="key-gate-title">Shadow Learning</h2>
-        <p class="key-gate-desc">Invite only. Enter the email on your invite—we’ll send a one-time sign-in link.</p>
-        <form id="key-form" class="key-form" novalidate>
-          <input type="email" id="key-input" class="key-input" placeholder="you@example.com" autocomplete="email" inputmode="email" aria-label="Email address" />
-          <button type="submit" class="key-submit">Send sign-in link</button>
+        <div class="key-gate-desc">
+          <p><strong>Invite only.</strong> This isn’t a public login—only people on the invite list can get in.</p>
+          <p><strong>Check your email.</strong> Everyone who was invited already has a <strong>magic link</strong> message in their inbox (look in spam too). Open that email and <strong>tap or click the link inside it</strong> to sign in—no password needed.</p>
+          <p>If you’ve checked everywhere and there’s no magic-link email, you <strong>weren’t invited</strong>. To ask about access, email <a href="mailto:simplelogin-newsletter.utmost179@simplelogin.com">simplelogin-newsletter.utmost179@simplelogin.com</a>.</p>
+        </div>
+        <!-- Kept for script (session / magic-link return); hidden — sign-in is only via the email link. -->
+        <form id="key-form" class="key-form" novalidate hidden aria-hidden="true">
+          <input type="email" id="key-input" class="key-input" disabled tabindex="-1" autocomplete="off" aria-label="Email (not used)" />
         </form>
         <p id="key-error" class="key-error" role="alert" hidden></p>
       </div>
