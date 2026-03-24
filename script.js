@@ -780,11 +780,11 @@ if (taglineWordEl) {
   }, 2200);
 }
 
-// ——— Tab cloaking: when user switches away, show "Home - Classroom" and cloak favicon; restore when they return ———
+// ——— Tab cloaking: when user switches away, show "Google Docs" and cloak favicon; restore when they return ———
 // Uses same-origin cloak-favicon.svg + fetch→blob URL so Chromium actually refreshes the tab icon on GitHub Pages.
 (function tabCloak() {
   if (!document.head) return;
-  var CLOAK_TITLE = "Home - Classroom";
+  var CLOAK_TITLE = "Google Docs";
   var CLOAK_FILE = "cloak-favicon.svg";
   var CLOAK_FAVICON_INLINE =
     "data:image/svg+xml," +
