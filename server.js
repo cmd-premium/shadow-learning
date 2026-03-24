@@ -543,7 +543,9 @@ const server = http.createServer((req, res) => {
 
   // Cloak favicon: proxy Discord image so it loads when CDN is blocked (e.g. school network)
   if (url === "/cloak-favicon" || url === "/cloak-favicon.png") {
-    const CLOAK_FAVICON_URL = "https://media.discordapp.net/attachments/1133385262903328821/1481443467447111791/image-removebg-preview_6.png?ex=69bc8fbe&is=69bb3e3e&hm=70c96166cc6cab44e6de0972d5ef8c8d9dc5cea1e0aec21aa617802fcc24ba74&=&format=webp&quality=lossless&width=1250&height=1250";
+    const CLOAK_FAVICON_URL =
+      process.env.CLOAK_FAVICON_URL ||
+      "https://media.discordapp.net/attachments/1133385262903328821/1481443467447111791/image-removebg-preview_6.png?ex=69be89fe&is=69bd387e&hm=53163db1a7e760fd03fba43158cf0ce1e721e13ca844bd6a7384e571198bfafd&=&format=webp&quality=lossless&width=1250&height=1250";
     const reqUrl = urlModule.parse(CLOAK_FAVICON_URL);
     const proxyReq = https.request(
       {
