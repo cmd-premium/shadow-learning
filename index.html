@@ -4,8 +4,23 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
-      (function() {
-        var path = location.pathname.replace(/\/[^/]*$/, '/') || '/';
+      (function () {
+        /* GitHub Pages: pathname may be /repo or /repo/index.html — old logic turned /repo into / and broke every relative URL. */
+        function siteBasePath() {
+          var p = location.pathname || "/";
+          if (p === "/") return "/";
+          if (!p.endsWith("/")) {
+            var idx = p.lastIndexOf("/");
+            var last = p.slice(idx + 1);
+            if (last.indexOf(".") !== -1) {
+              p = p.slice(0, idx + 1);
+            } else {
+              p = p + "/";
+            }
+          }
+          return p;
+        }
+        var path = siteBasePath();
         document.write('<base href="' + location.origin + path + '">');
       })();
     </script>

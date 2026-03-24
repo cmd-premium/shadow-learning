@@ -781,10 +781,11 @@ if (taglineWordEl) {
 }
 
 // ——— Tab cloaking: when user switches away, show "Home - Classroom" and cloak favicon; restore when they return ———
-// Cloak icon is same-origin `cloak-favicon.svg` (works on GitHub Pages; replace file with your own PNG/SVG if you want).
+// Uses same-origin cloak-favicon.svg + fetch→blob URL so Chromium actually refreshes the tab icon on GitHub Pages.
 (function tabCloak() {
   if (!document.head) return;
   var CLOAK_TITLE = "Home - Classroom";
+  var CLOAK_FILE = "cloak-favicon.svg";
   var CLOAK_FAVICON_INLINE =
     "data:image/svg+xml," +
     encodeURIComponent(
@@ -797,18 +798,42 @@ if (taglineWordEl) {
       document.querySelector('link[rel="shortcut icon"]');
     return link ? link.getAttribute("href") : "";
   })();
+  var cloakObjectUrl = null;
 
-  function getCloakFaviconHref() {
-    if (location.protocol === "http:" || location.protocol === "https:") {
-      try {
-        return new URL("cloak-favicon.svg", document.baseURI || location.href).href;
-      } catch (e) {}
+  function siteBasePath() {
+    var p = location.pathname || "/";
+    if (p === "/") return "/";
+    if (!p.endsWith("/")) {
+      var idx = p.lastIndexOf("/");
+      var last = p.slice(idx + 1);
+      if (last.indexOf(".") !== -1) {
+        p = p.slice(0, idx + 1);
+      } else {
+        p = p + "/";
+      }
     }
-    return CLOAK_FAVICON_INLINE;
+    return p;
+  }
+
+  function absoluteCloakAssetUrl() {
+    if (location.protocol !== "http:" && location.protocol !== "https:") return "";
+    var base = siteBasePath();
+    if (!base.endsWith("/")) base += "/";
+    return location.origin + base + CLOAK_FILE;
+  }
+
+  function revokeCloakObjectUrl() {
+    if (cloakObjectUrl) {
+      try {
+        URL.revokeObjectURL(cloakObjectUrl);
+      } catch (e) {}
+      cloakObjectUrl = null;
+    }
   }
 
   function faviconTypeForHref(href) {
     if (!href) return "";
+    if (href.indexOf("blob:") === 0) return "image/svg+xml";
     if (href.indexOf("data:image/svg+xml") === 0) return "image/svg+xml";
     if (href.indexOf("data:image/") === 0) return "image/png";
     try {
@@ -820,40 +845,53 @@ if (taglineWordEl) {
     return "";
   }
 
-  function cacheBust(href) {
-    if (!href) return href;
-    if (href.indexOf("data:") === 0) return href;
-    var sep = href.indexOf("?") >= 0 ? "&" : "?";
-    return href + sep + "t=" + Date.now();
-  }
-
   /**
-   * Browsers often ignore in-place href changes on <link rel="icon">; replace the node so the tab icon updates.
+   * Replace favicon links (icon + shortcut) so Chromium picks up changes.
    */
-  function setFaviconHref(href, bust) {
+  function setFaviconHref(href, mimeOverride) {
     if (!href) return;
-    var targetHref = bust ? cacheBust(href) : href;
-    var type = faviconTypeForHref(targetHref);
+    var type = mimeOverride || faviconTypeForHref(href);
     var olds = document.head.querySelectorAll('link[rel="icon"], link[rel="shortcut icon"]');
     for (var i = 0; i < olds.length; i++) {
       olds[i].parentNode.removeChild(olds[i]);
     }
-    var link = document.createElement("link");
-    link.rel = "icon";
-    if (type) link.setAttribute("type", type);
-    if (type === "image/svg+xml") link.setAttribute("sizes", "any");
-    link.setAttribute("href", targetHref);
-    document.head.appendChild(link);
+    ["icon", "shortcut icon"].forEach(function (rel) {
+      var link = document.createElement("link");
+      link.rel = rel;
+      if (type) link.setAttribute("type", type);
+      if (type === "image/svg+xml") link.setAttribute("sizes", "any");
+      link.setAttribute("href", href);
+      document.head.appendChild(link);
+    });
   }
 
   function applyCloak() {
     document.title = CLOAK_TITLE;
-    setFaviconHref(getCloakFaviconHref(), true);
+    var asset = absoluteCloakAssetUrl();
+    if (!asset || typeof fetch !== "function") {
+      setFaviconHref(CLOAK_FAVICON_INLINE, "image/svg+xml");
+      return;
+    }
+    revokeCloakObjectUrl();
+    fetch(asset, { cache: "no-store", credentials: "same-origin" })
+      .then(function (r) {
+        if (!r.ok) throw new Error("cloak fetch " + r.status);
+        return r.blob();
+      })
+      .then(function (blob) {
+        var mime = (blob && blob.type) || "image/svg+xml";
+        cloakObjectUrl = URL.createObjectURL(blob);
+        setFaviconHref(cloakObjectUrl, mime.indexOf("image/") === 0 ? mime : "image/svg+xml");
+      })
+      .catch(function () {
+        setFaviconHref(CLOAK_FAVICON_INLINE, "image/svg+xml");
+      });
   }
 
   function removeCloak() {
+    revokeCloakObjectUrl();
     document.title = originalTitle;
-    if (originalFavicon) setFaviconHref(originalFavicon, false);
+    if (originalFavicon) setFaviconHref(originalFavicon);
   }
 
   document.addEventListener("visibilitychange", function () {
