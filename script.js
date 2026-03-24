@@ -141,13 +141,29 @@ var SHADOW_LOADING_MS = 1800;
   if (!form || !input) return;
 
   var sb = null;
+  /** Reads `invites` as anon only (no user JWT). If RLS allows SELECT for `anon` but not `authenticated`, using the logged-in client returns 0 rows and looks like “not invited”. */
+  var sbInvites = null;
   try {
     var NS = typeof window !== "undefined" && window.supabase;
     if (NS && typeof NS.createClient === "function") {
       sb = NS.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      sbInvites = NS.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+          storage: {
+            getItem: function () {
+              return null;
+            },
+            setItem: function () {},
+            removeItem: function () {}
+          }
+        }
+      });
     }
   } catch (e) {}
-  if (!sb) {
+  if (!sb || !sbInvites) {
     if (errorEl) {
       errorEl.textContent = "Sign-in isn’t available (missing Supabase). Check script order.";
       errorEl.hidden = false;
@@ -202,7 +218,7 @@ var SHADOW_LOADING_MS = 1800;
    */
   function isInvitedEmail(email) {
     var normalized = normalizeEmail(email);
-    return sb
+    return sbInvites
       .from(INVITES_TABLE)
       .select("email")
       .eq("email", normalized)
@@ -211,7 +227,7 @@ var SHADOW_LOADING_MS = 1800;
         if (res.error) return { invited: false, error: res.error };
         if (res.data && res.data.length > 0) return { invited: true, error: null };
         var pat = escapeForIlike(normalized);
-        return sb
+        return sbInvites
           .from(INVITES_TABLE)
           .select("email")
           .ilike("email", pat)
